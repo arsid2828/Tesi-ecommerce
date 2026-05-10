@@ -1,0 +1,7 @@
+l’ho usato per ragionare criticamente sulla scelta dei dataset, confrontare diverse alternative possibili per un sistema di raccomandazione e-commerce e valutare la compatibilità tra dataset di recensioni/rating e dataset di question answering.
+In particolare, l’ho usato per generare e correggere script Python utili a controllare se avesse senso combinare il dataset **Amazon Reviews 2023** con il dataset storico **Amazon Question/Answer Data**.
+
+Il punto principale era verificare se i due dataset avessero abbastanza prodotti in comune, confrontando gli identificativi `asin` e `parent_asin`. Fare questa verifica manualmente sarebbe stato molto lento e poco pratico, perché i dataset sono grandi e contengono molti prodotti, recensioni e metadati. ChatGPT mi ha aiutato a costruire un notebook per scaricare/caricare i dati, estrarre gli identificativi dei prodotti, calcolare le intersezioni tra categorie diverse e salvare il sottoinsieme finale di prodotti, recensioni e metadati utilizzabili.
+[[Scelta dataset beauty]][[Log decisione dataset]]
+
+Uso per supporto alla scrittura di codice, per capire il funzionamento di funzioni Python e capire eventuali problemi riscontrati nella compilazione o esecuzione del codice.
