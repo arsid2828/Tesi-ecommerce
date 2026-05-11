@@ -173,3 +173,33 @@ data/processed/
 
 # Mac
 .DS_Store
+
+# File locali di Obsidian
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache/
+.obsidian/logs/
+
+# Cestino Obsidian
+.trash/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Python / notebook
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+
+# Dataset e file pesanti
+data/
+*.parquet
+*.jsonl
+*.jsonl.gz
+*.csv
+
+# File sensibili eventuali
+*.env
+secrets.*

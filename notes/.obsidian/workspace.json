@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Methodology-Dataset/Ragionamenti su dati ottenuti da Notebook01.md",
+                "file": "10-05-2026.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Ragionamenti su dati ottenuti da Notebook01"
+              "title": "10-05-2026"
             }
           }
         ]
@@ -185,14 +185,14 @@
   },
   "active": "06a1bdfaea9a1aa3",
   "lastOpenFiles": [
-    "Methodology-Dataset/Dataset Electronics.md",
-    "Methodology-Dataset/Ragionamenti su dati ottenuti da Notebook01.md",
-    "Project-Notebook-explained/02_explore_electronics_dataset.md",
-    "Project-Notebook-explained/01_prepare_electronics_intersection.md",
-    "02-05-2026.md",
-    "08-05-2026.md",
     "09-05-2026.md",
     "10-05-2026.md",
+    "Project-Notebook-explained/01_prepare_electronics_intersection.md",
+    "Project-Notebook-explained/02_explore_electronics_dataset.md",
+    "Methodology-Dataset/Ragionamenti su dati ottenuti da Notebook01.md",
+    "Methodology-Dataset/Dataset Electronics.md",
+    "02-05-2026.md",
+    "08-05-2026.md",
     "Methodology-Dataset/Scelta dataset beauty.md",
     "Methodology-Dataset/Log decisione dataset.md",
     "AI_Log/Chat GPT.md",
