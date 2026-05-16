@@ -31,3 +31,6 @@ soglie di qa: per prodotti, righe qa e rating
 - 10 49% prodotti, 63% righe, 79% rating
 - 20 rimane solo circa 0%
 L’analisi mostra che quasi tutti i prodotti dispongono di almeno 3 righe QA. Una soglia pari a 4 mantiene ancora oltre il 91% dei prodotti e quasi il 98% delle interazioni rating. Soglie più alte, come 10 o 20, riducono sensibilmente il catalogo e non sono adatte come filtro principale per il recommender. Il QA verrà quindi considerato soprattutto come informazione aggiuntiva per il prototipo e come possibile base per un’estensione futura di Question Answering.
+
+## cella 12:
+La matrice utente-prodotto risulta estremamente sparsa: solo lo 0,006% delle possibili coppie utente-prodotto è osservato nel dataset. Questo conferma una caratteristica tipica dei dati e-commerce, dove molti utenti interagiscono con pochi prodotti rispetto alla dimensione complessiva del catalogo. La sparsità giustifica la necessità di applicare filtri minimi su utenti e prodotti prima della costruzione dei dataset di train, validation e test.
