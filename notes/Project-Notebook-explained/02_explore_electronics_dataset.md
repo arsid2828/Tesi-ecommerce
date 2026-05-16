@@ -21,3 +21,13 @@ La soglia sugli utenti ha un impatto molto forte: la maggior parte degli utenti 
 
 ## Cella 9:
 A differenza degli utenti, i prodotti risultano mediamente più rappresentati: la mediana è pari a 52 interazioni per prodotto e il 75% dei prodotti ha al massimo 137 interazioni. La distribuzione resta comunque sbilanciata, con pochi prodotti molto popolari che raggiungono migliaia di interazioni. Questo suggerisce che un filtro minimo sui prodotti può essere applicato, ma non deve essere troppo aggressivo per non ridurre inutilmente il catalogo.
+
+## Cella 10:
+soglie di qa: per prodotti, righe qa e rating
+- 1 tutti
+- 2 tieni 99%
+- 3 sempre sopra 99%
+- 4 91% prodotti, 96% righe, 97% rating
+- 10 49% prodotti, 63% righe, 79% rating
+- 20 rimane solo circa 0%
+L’analisi mostra che quasi tutti i prodotti dispongono di almeno 3 righe QA. Una soglia pari a 4 mantiene ancora oltre il 91% dei prodotti e quasi il 98% delle interazioni rating. Soglie più alte, come 10 o 20, riducono sensibilmente il catalogo e non sono adatte come filtro principale per il recommender. Il QA verrà quindi considerato soprattutto come informazione aggiuntiva per il prototipo e come possibile base per un’estensione futura di Question Answering.
