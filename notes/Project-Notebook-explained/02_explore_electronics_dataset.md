@@ -32,5 +32,22 @@ soglie di qa: per prodotti, righe qa e rating
 - 20 rimane solo circa 0%
 L’analisi mostra che quasi tutti i prodotti dispongono di almeno 3 righe QA. Una soglia pari a 4 mantiene ancora oltre il 91% dei prodotti e quasi il 98% delle interazioni rating. Soglie più alte, come 10 o 20, riducono sensibilmente il catalogo e non sono adatte come filtro principale per il recommender. Il QA verrà quindi considerato soprattutto come informazione aggiuntiva per il prototipo e come possibile base per un’estensione futura di Question Answering.
 
-## cella 12:
+## Cella 12:
 La matrice utente-prodotto risulta estremamente sparsa: solo lo 0,006% delle possibili coppie utente-prodotto è osservato nel dataset. Questo conferma una caratteristica tipica dei dati e-commerce, dove molti utenti interagiscono con pochi prodotti rispetto alla dimensione complessiva del catalogo. La sparsità giustifica la necessità di applicare filtri minimi su utenti e prodotti prima della costruzione dei dataset di train, validation e test.
+
+## Cella 13:
+Studio delle configurazioni.
+Per utenti:
+2 troppo poco, per poter fare train val test
+3 probabilmente la migliore, il minimo per train val test e mantengono molti utenti e interazioni
+4 e 5 sono più pulite ma tagliano molti utenti, quasi la metà.
+Per ora migliore è utenti con int >= 3
+
+Poi vediamo con 3 utenti, testiamo le soglie di prodotti da 5 a 10 interazioni:
+5 conservativa, mantiene quasi tutto
+6 perdiamo 2k utenti e 1k prodotti circa
+7 perdiamo 4k utenti e 2k prodotti circa ma sale un po' la densità
+8 perdiamo 6k utenti e 2,5k prodotti, potrebbe essere una scelta interessante
+9 e 10 ci avviciniamo a 10k utenti persi e 4k prodotti persi, non vale la pena filtrare cosi tanto e perdere cosi tanti prodotti , utenti e interazioni.
+
+La configurazione user3_item8 è stata scelta come compromesso tra ampiezza del dataset e qualità del segnale collaborativo. Mantiene 196.509 utenti, 15.069 prodotti e 844.060 interazioni, permettendo uno split train/validation/test grazie alla soglia minima di 3 interazioni per utente. Rispetto a soglie prodotto più leggere riduce moderatamente il catalogo, ma aumenta la densità della matrice e il numero medio di interazioni per prodotto, mantenendo comunque un dataset ampio per gli esperimenti successivi.
