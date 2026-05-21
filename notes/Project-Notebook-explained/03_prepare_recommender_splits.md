@@ -15,3 +15,10 @@ Lo split viene costruito in modo temporale per ciascun utente: l’ultima intera
 
 ## cella 10:
 In questa sezione si verifica se in validation e test compaiono prodotti mai osservati nel training set. Questo controllo è necessario perché un modello collaborative filtering puro può raccomandare solo prodotti presenti nel train: se un item compare per la prima volta in validation o test, il modello non dispone di interazioni precedenti da cui apprendere una rappresentazione. Nel dataset ottenuto, il train contiene 12.299 prodotti su 12.306 prodotti finali, quindi solo pochi item risultano potenzialmente assenti dal training set. Per una valutazione corretta dei modelli collaborative filtering, vengono quindi create versioni valutabili di validation e test mantenendo solo le interazioni relative a prodotti già presenti nel train.
+
+## cella 11:
+In questa sezione vengono costruiti i campioni negativi necessari per valutare i modelli top-N: per ogni interazione positiva in validation e test vengono selezionati **100 prodotti negativi** tra gli item presenti nel train, escludendo i prodotti già osservati positivamente dallo stesso utente. Il catalogo candidato per il campionamento contiene **12.299 item**, cioè i prodotti presenti nel training set. Il negative sampling produce **131.376 righe per la validation** e **131.352 righe per il test**, in linea con le versioni valutabili degli split dopo la rimozione dei pochi item cold-start.
+
+## cella 12:
+In questa sezione viene valutata una baseline semplice basata sulla popolarità degli item nel training set: un prodotto riceve un punteggio più alto se compare più spesso nelle interazioni di train. La baseline viene applicata ai negative samples di validation e test, per un totale di **262.728 esempi valutati**. Questa baseline è utile come punto di confronto minimo: i modelli successivi dovranno superarla per dimostrare di usare davvero informazione personalizzata.
+
