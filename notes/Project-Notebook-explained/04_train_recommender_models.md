@@ -57,3 +57,12 @@ Anche sul test set il modello migliore resta **MostPopular**, con `HitRate@10=0,
 In questa sezione vengono salvati i risultati principali prodotti dal notebook, così da poterli riutilizzare nei notebook successivi e nella fase di analisi finale. Vengono esportate le metriche complessive, la tabella di confronto con MostPopular, i punteggi di popolarità dei prodotti e, se richiesto dalla configurazione, anche i rank dettagliati e gli artefatti dei modelli.
 
 Il summary finale riassume l’esperimento: il dataset usato è `Electronics`, la metrica principale è `NDCG@10`, il miglior modello su validation è `MostPopular` con punteggio `0,2843`, mentre il miglior SVD è `SVD_4`. Il notebook lavora su `287.752` interazioni di training, `131.376` esempi di validation, `131.352` esempi di test, `131.398` utenti e `12.306` prodotti. Questi file salvati saranno utili per il Notebook 05 e per il confronto finale dei modelli.
+
+## cella 11:
+In questa sezione vengono generate alcune raccomandazioni demo per verificare qualitativamente il comportamento del modello migliore scelto su validation. Il modello selezionato è **MostPopular**, quindi le raccomandazioni prodotte sono basate principalmente sulla frequenza dei prodotti nel training set, escludendo però i prodotti già visti dall’utente.
+
+Per i primi utenti demo, i prodotti consigliati risultano molto simili tra loro, come atteso da un modello non personalizzato. Tra i prodotti più raccomandati compaiono accessori elettronici molto frequenti nel training set, come cavi HDMI, mouse Logitech, hub USB, schede microSD e webcam. Il primo prodotto consigliato ha `item_idx=5996`, `parent_asin=B0052SCU8U` e score `1118`, corrispondente al numero di interazioni osservate nel train.
+
+Questa sezione non serve a valutare formalmente il modello, ma a controllare se le raccomandazioni sono leggibili e coerenti con il comportamento atteso. Il risultato conferma che MostPopular tende a proporre prodotti generalmente frequenti e plausibili, ma non realmente personalizzati rispetto al singolo utente.
+
+Il file `demo_recommendations.csv` viene salvato correttamente nella cartella `notebook04_models` e può essere riutilizzato nei notebook successivi o come primo materiale per il prototipo. Il controllo finale sui percorsi mostra che i principali output del notebook sono stati creati correttamente, inclusi metriche, confronto con la baseline, summary, punteggi di popolarità, raccomandazioni demo, rank e artefatti dei modelli.
