@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dettaglio prodotto</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body data-page="product">
+    <!-- Intestazione pagina dettaglio -->
+    <header class="site-header compact">
+      <a class="back-link" href="index.html">Torna al catalogo</a>
+      <h1>Dettaglio prodotto</h1>
+    </header>
+
+    <!-- Contenuto principale della pagina prodotto -->
+    <main class="page-shell">
+      <!-- Dettaglio prodotto caricato via API -->
+      <section id="productDetail" class="product-detail"></section>
+
+      <!-- Raccomandazioni baseline MostPopular -->
+      <section class="content-section">
+        <div class="section-heading">
+          <h2>Consigliati</h2>
+          <p>Baseline MostPopular</p>
+        </div>
+        <div id="recommendationsGrid" class="product-grid"></div>
+      </section>
+    </main>
+
+    <!-- Logica frontend vanilla JS -->
+    <script src="app.js"></script>
+  </body>
+</html>

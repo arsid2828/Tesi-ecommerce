@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Product Discovery Prototype</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body data-page="catalog">
+    <!-- Intestazione principale del prototipo -->
+    <header class="site-header">
+      <div>
+        <h1>Product Discovery Prototype</h1>
+        <p class="intro">Catalogo demo Amazon-like con ricerca testuale e ordinamento MostPopular.</p>
+      </div>
+    </header>
+
+    <!-- Contenuto principale della home catalogo -->
+    <main class="page-shell">
+      <!-- Barra ricerca e filtro categoria -->
+      <section class="toolbar" aria-label="Ricerca prodotti">
+        <label class="field">
+          <span>Ricerca</span>
+          <input id="searchInput" type="search" placeholder="Cerca per titolo, categoria o descrizione">
+        </label>
+        <label class="field">
+          <span>Categoria</span>
+          <select id="categorySelect">
+            <option value="">Tutte le categorie</option>
+          </select>
+        </label>
+        <button id="searchButton" class="primary-button" type="button">Cerca</button>
+      </section>
+
+      <!-- Griglia risultati ricerca -->
+      <section class="content-section">
+        <div class="section-heading">
+          <h2>Risultati</h2>
+          <p id="resultsCount"></p>
+        </div>
+        <div id="resultsGrid" class="product-grid"></div>
+      </section>
+
+      <!-- Griglia prodotti ordinati per popolarita -->
+      <section class="content-section">
+        <div class="section-heading">
+          <h2>Prodotti popolari</h2>
+        </div>
+        <div id="popularGrid" class="product-grid"></div>
+      </section>
+    </main>
+
+    <!-- Logica frontend vanilla JS -->
+    <script src="app.js"></script>
+  </body>
+</html>

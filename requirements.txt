@@ -1,6 +1,9 @@
 # Dipendenze del progetto
 datasets==3.6.0
+fastapi
 pandas
+pydantic
 pyarrow
 requests
 tqdm
+uvicorn

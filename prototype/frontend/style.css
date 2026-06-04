@@ -1,0 +1,359 @@
+/* Variabili visive globali */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-soft: #eef2f5;
+  --text: #1f2933;
+  --muted: #64707d;
+  --line: #d8dee6;
+  --accent: #0f766e;
+  --accent-dark: #115e59;
+  --shadow: 0 10px 26px rgba(31, 41, 51, 0.08);
+}
+
+/* Reset base box model */
+* {
+  box-sizing: border-box;
+}
+
+/* Stile pagina generale */
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Header principale */
+.site-header {
+  background: #23313d;
+  color: #fff;
+  padding: 28px clamp(16px, 4vw, 48px);
+}
+
+/* Header compatto per pagina dettaglio */
+.site-header.compact {
+  padding-bottom: 24px;
+}
+
+/* Titolo header */
+.site-header h1 {
+  margin: 0 0 8px;
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 700;
+}
+
+/* Testi secondari */
+.intro,
+.section-heading p,
+.category {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* Testo secondario dentro header */
+.site-header .intro {
+  color: #cbd5df;
+}
+
+/* Contenitore centrale pagina */
+.page-shell {
+  width: min(1180px, calc(100% - 32px));
+  margin: 24px auto 48px;
+}
+
+/* Barra ricerca e filtri */
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 280px) auto;
+  gap: 12px;
+  align-items: end;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+
+/* Campo form con label */
+.field {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* Controlli form e bottoni */
+input,
+select,
+button {
+  min-height: 42px;
+  border-radius: 6px;
+  font: inherit;
+}
+
+/* Input e select */
+input,
+select {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--text);
+  padding: 0 12px;
+}
+
+/* Stile base bottoni */
+button {
+  border: 0;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+/* Bottone principale ricerca */
+.primary-button {
+  background: var(--accent);
+  color: #fff;
+  padding: 0 22px;
+}
+
+/* Hover bottone principale */
+.primary-button:hover {
+  background: var(--accent-dark);
+}
+
+/* Bottone dettaglio prodotto */
+.secondary-button {
+  width: 100%;
+  background: #23313d;
+  color: #fff;
+  margin-top: auto;
+}
+
+/* Sezioni contenuto */
+.content-section {
+  margin-top: 28px;
+}
+
+/* Header delle sezioni */
+.section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+/* Titoli sezione */
+.section-heading h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+/* Griglia card prodotto */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 18px;
+}
+
+/* Card prodotto */
+.product-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 440px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+/* Contenitori immagine */
+.product-image,
+.detail-image {
+  display: grid;
+  place-items: center;
+  background: var(--surface-soft);
+}
+
+/* Box immagine nelle card */
+.product-image {
+  flex: 0 0 190px;
+  height: 190px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+}
+
+/* Immagini prodotto nelle card */
+.product-image img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  padding: 10px;
+}
+
+/* Immagine grande nella pagina dettaglio */
+.detail-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 12px;
+}
+
+/* Placeholder quando manca immagine */
+.image-placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 150px;
+  padding: 16px;
+  color: var(--muted);
+  text-align: center;
+  background:
+    linear-gradient(135deg, transparent 48%, #d2dae2 49%, #d2dae2 51%, transparent 52%),
+    var(--surface-soft);
+}
+
+/* Corpo testuale della card */
+.card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 14px 14px;
+  background: var(--surface);
+}
+
+/* Titolo prodotto in card */
+.card-body h3 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.35;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+}
+
+/* Categoria prodotto */
+.category {
+  color: var(--accent-dark);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Metadati rating e recensioni */
+.meta-row {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* Layout dettaglio prodotto */
+.product-detail {
+  display: grid;
+  grid-template-columns: minmax(260px, 420px) 1fr;
+  gap: 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+
+/* Box immagine dettaglio */
+.detail-image {
+  min-height: 360px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+/* Titolo dettaglio */
+.detail-info h2 {
+  margin: 6px 0 14px;
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+/* Descrizione prodotto */
+.description {
+  color: #3a4652;
+  line-height: 1.6;
+}
+
+/* Griglia statistiche dettaglio */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  gap: 12px;
+  margin: 24px 0 0;
+}
+
+/* Singola statistica */
+.stats div {
+  background: var(--surface-soft);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+/* Etichetta statistica */
+.stats dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Valore statistica */
+.stats dd {
+  margin: 4px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+/* Link ritorno catalogo */
+.back-link {
+  color: #fff;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+/* Hover link ritorno */
+.back-link:hover {
+  text-decoration: underline;
+}
+
+/* Stato vuoto delle griglie */
+.empty-state {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 24px;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  text-align: center;
+}
+
+/* Layout mobile */
+@media (max-width: 760px) {
+  /* Stack verticale su schermi stretti */
+  .toolbar,
+  .product-detail {
+    grid-template-columns: 1fr;
+  }
+
+  /* Bottone ricerca a larghezza piena */
+  .primary-button {
+    width: 100%;
+  }
+
+  /* Statistiche dettaglio in colonna */
+  .stats {
+    grid-template-columns: 1fr;
+  }
+}
