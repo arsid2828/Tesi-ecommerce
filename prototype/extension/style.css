@@ -8,9 +8,13 @@
   --extension-line: #d9e0e8;
   --extension-accent: #0b7a75;
   --extension-accent-dark: #095f5b;
+  --extension-accent-soft: #dff3ef;
+  --extension-highlight: #f2b84b;
+  --extension-highlight-soft: #fff7df;
   --extension-error: #9b1c1c;
   --extension-error-bg: #fff1f1;
-  --extension-shadow: 0 10px 24px rgba(24, 34, 45, 0.1);
+  --extension-shadow: 0 14px 30px rgba(24, 34, 45, 0.12);
+  --extension-shadow-soft: 0 8px 18px rgba(24, 34, 45, 0.08);
 }
 
 /*stile popup estensione*/
@@ -18,7 +22,9 @@ body.extension-popup {
   width: 380px;
   min-height: 520px;
   margin: 0;
-  background: var(--extension-bg);
+  background:
+    linear-gradient(180deg, #e9f1f3 0, var(--extension-bg) 170px),
+    var(--extension-bg);
   color: var(--extension-text);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
   line-height: 1.45;
@@ -34,19 +40,40 @@ body.extension-popup .popup-shell {
   display: grid;
   gap: 12px;
   padding: 14px;
+  animation: popupFadeIn 0.28s ease both;
 }
 
 /*header popup*/
 body.extension-popup .popup-header {
+  position: relative;
+  overflow: hidden;
   background: #182632;
   color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-bottom: 4px solid var(--extension-accent);
   border-radius: 8px;
   padding: 14px;
+  box-shadow: var(--extension-shadow);
+}
+
+/*linea decorativa header*/
+body.extension-popup .popup-header::after {
+  content: "";
+  position: absolute;
+  right: -34px;
+  bottom: -34px;
+  width: 108px;
+  height: 108px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--extension-highlight) 38%, transparent), rgba(11, 122, 117, 0.12));
+  border-radius: 26px;
+  transform: rotate(18deg);
 }
 
 /*eyebrow popup*/
 body.extension-popup .popup-kicker {
+  position: relative;
+  z-index: 1;
   margin: 0 0 4px;
   color: #cbd5df;
   font-size: 12px;
@@ -56,6 +83,8 @@ body.extension-popup .popup-kicker {
 
 /*titolo popup*/
 body.extension-popup .popup-header h1 {
+  position: relative;
+  z-index: 1;
   margin: 0;
   font-size: 20px;
   line-height: 1.2;
@@ -70,6 +99,27 @@ body.extension-popup .popup-section {
   border: 1px solid var(--extension-line);
   border-radius: 8px;
   padding: 12px;
+  box-shadow: var(--extension-shadow-soft);
+  animation: sectionIn 0.32s ease both;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+/*ritardo ingresso sezioni*/
+body.extension-popup .popup-section:nth-of-type(1) {
+  animation-delay: 0.04s;
+}
+
+body.extension-popup .popup-section:nth-of-type(2) {
+  animation-delay: 0.08s;
+}
+
+body.extension-popup .popup-section:nth-of-type(3) {
+  animation-delay: 0.12s;
+}
+
+/*hover sezioni*/
+body.extension-popup .popup-section:hover {
+  border-color: #c8d4df;
   box-shadow: var(--extension-shadow);
 }
 
@@ -103,13 +153,17 @@ body.extension-popup .url-value {
   color: var(--extension-text);
   font-size: 13px;
   overflow-wrap: anywhere;
+  padding: 8px;
+  background: var(--extension-surface-soft);
+  border: 1px solid var(--extension-line);
+  border-radius: 6px;
 }
 
 /*valore item_id*/
 body.extension-popup .item-id-value {
   margin: 0;
   padding: 8px;
-  background: var(--extension-surface-soft);
+  background: var(--extension-highlight-soft);
   border: 1px solid var(--extension-line);
   border-radius: 6px;
   color: var(--extension-text);
@@ -120,6 +174,9 @@ body.extension-popup .item-id-value {
 
 /*stato backend*/
 body.extension-popup .status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   width: fit-content;
   border-radius: 999px;
   padding: 5px 10px;
@@ -127,15 +184,25 @@ body.extension-popup .status-pill {
   font-weight: 700;
 }
 
+/*pallino stato backend*/
+body.extension-popup .status-pill::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
 /*stato in controllo*/
 body.extension-popup .status-muted {
   background: var(--extension-surface-soft);
   color: var(--extension-muted);
+  animation: softPulse 1.4s ease-in-out infinite;
 }
 
 /*stato online*/
 body.extension-popup .status-online {
-  background: #e7f6f2;
+  background: var(--extension-accent-soft);
   color: var(--extension-accent-dark);
 }
 
@@ -150,22 +217,34 @@ body.extension-popup .primary-button {
   min-height: 42px;
   border: 0;
   border-radius: 6px;
-  background: var(--extension-accent);
+  background:
+    linear-gradient(135deg, var(--extension-accent), var(--extension-accent-dark));
   color: #fff;
   cursor: pointer;
   font: inherit;
   font-weight: 700;
+  box-shadow: 0 8px 16px rgba(11, 122, 117, 0.22);
+  transition: box-shadow 0.16s ease, filter 0.16s ease, transform 0.16s ease;
 }
 
 /*hover bottone*/
 body.extension-popup .primary-button:hover {
-  background: var(--extension-accent-dark);
+  filter: brightness(1.04);
+  box-shadow: 0 11px 20px rgba(11, 122, 117, 0.28);
+  transform: translateY(-1px);
+}
+
+/*click bottone*/
+body.extension-popup .primary-button:active {
+  transform: translateY(0);
 }
 
 /*bottone disabilitato*/
 body.extension-popup .primary-button:disabled {
   background: #aeb8c2;
+  box-shadow: none;
   cursor: not-allowed;
+  transform: none;
 }
 
 /*focus accessibile*/
@@ -180,7 +259,8 @@ body.extension-popup .result-box {
   gap: 4px;
   margin: 0;
   padding: 10px;
-  background: var(--extension-surface-soft);
+  background:
+    linear-gradient(180deg, #ffffff, var(--extension-surface-soft));
   border: 1px solid var(--extension-line);
   border-radius: 6px;
 }
@@ -224,6 +304,7 @@ body.extension-popup .popup-product-image {
   background: #fff;
   border: 1px solid var(--extension-line);
   border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8);
 }
 
 /*miniatura raccomandazione*/
@@ -236,6 +317,7 @@ body.extension-popup .recommendation-image {
   background: #fff;
   border: 1px solid var(--extension-line);
   border-radius: 6px;
+  transition: border-color 0.16s ease, transform 0.16s ease;
 }
 
 /*immagini prodotto nel popup*/
@@ -247,6 +329,7 @@ body.extension-popup .recommendation-image img {
   width: auto;
   height: auto;
   object-fit: contain;
+  transition: transform 0.18s ease;
 }
 
 /*fallback immagine popup*/
@@ -293,12 +376,30 @@ body.extension-popup .recommendations-list li {
   background: var(--extension-surface-soft);
   border: 1px solid var(--extension-line);
   border-radius: 6px;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
 }
 
 /*raccomandazione con miniatura*/
 body.extension-popup .recommendation-item {
   grid-template-columns: 58px minmax(0, 1fr);
   align-items: center;
+}
+
+/*hover raccomandazione*/
+body.extension-popup .recommendation-item:hover {
+  background: #ffffff;
+  border-color: #c7d0db;
+  transform: translateX(2px);
+}
+
+/*hover miniatura*/
+body.extension-popup .recommendation-item:hover .recommendation-image {
+  border-color: var(--extension-accent);
+}
+
+/*hover immagine*/
+body.extension-popup .recommendation-item:hover img {
+  transform: scale(1.04);
 }
 
 /*testi raccomandazione*/
@@ -324,11 +425,13 @@ body.extension-popup .empty-list-item {
 
 /*box iniettato nella pagina prodotto*/
 .thesis-extension-box {
+  position: relative;
   display: grid;
   gap: 5px;
   margin: 0 0 18px;
   padding: 12px 14px;
-  background: #ffffff;
+  background:
+    linear-gradient(180deg, #ffffff, #f7f9fb);
   border: 1px solid #d9e0e8;
   border-left: 4px solid #0b7a75;
   border-radius: 8px;
@@ -337,6 +440,19 @@ body.extension-popup .empty-list-item {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
   font-size: 14px;
   line-height: 1.35;
+  animation: contentBoxIn 0.32s ease both;
+}
+
+/*accento box in pagina*/
+.thesis-extension-box::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 9px;
+  height: 9px;
+  background: var(--extension-highlight);
+  border-radius: 999px;
 }
 
 /*titolo box iniettato*/
@@ -353,4 +469,73 @@ body.extension-popup .empty-list-item {
 .thesis-extension-box .thesis-extension-status {
   color: #095f5b;
   font-weight: 700;
+}
+
+/*animazione ingresso popup*/
+@keyframes popupFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/*animazione ingresso sezioni*/
+@keyframes sectionIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/*animazione stato in caricamento*/
+@keyframes softPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(102, 115, 129, 0.18);
+  }
+
+  50% {
+    box-shadow: 0 0 0 5px rgba(102, 115, 129, 0);
+  }
+}
+
+/*animazione box pagina*/
+@keyframes contentBoxIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/*riduce movimento se richiesto dal sistema*/
+@media (prefers-reduced-motion: reduce) {
+  body.extension-popup .popup-shell,
+  body.extension-popup .popup-section,
+  body.extension-popup .status-muted,
+  .thesis-extension-box {
+    animation: none;
+  }
+
+  body.extension-popup .primary-button,
+  body.extension-popup .recommendations-list li,
+  body.extension-popup .recommendation-image,
+  body.extension-popup .popup-product-image img,
+  body.extension-popup .recommendation-image img {
+    transition: none;
+  }
 }
