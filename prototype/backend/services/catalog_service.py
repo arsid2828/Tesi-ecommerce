@@ -25,6 +25,7 @@ class CatalogService:
 
         #prende ogni riga del json, la pulisce e la trasforma in un ogg Product, ** serve a spacchettare come parametri
         products=[Product(**self._clean_row(row)) for row in rows]
+        products=[product for product in products if self._has_price(product)]
         return sorted(products,key=lambda item: item.popularity_score,reverse=True) #ordina per popolarità
 
     #ripuliamo valori NaN letti dal JSON demo
@@ -37,6 +38,11 @@ class CatalogService:
         if isinstance(value,float) and math.isnan(value): #float e nan, converte in None
             return None
         return value
+
+    #teniamo nel sito solo prodotti con prezzo disponibile
+    @staticmethod
+    def _has_price(product: Product) -> bool:
+        return product.price is not None and product.price > 0
 
     #restituiamo lista di prodotti filtrati e paginati
     def list_products(

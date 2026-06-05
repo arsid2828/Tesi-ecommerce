@@ -26,6 +26,7 @@ COLUMN_ALIASES={
         "features_json",
         "details_json",
     ],
+    "price": ["price","product_price"],
     "average_rating": ["average_rating","avg_rating","rating","stars"],
     "rating_count": ["rating_count","review_count","ratings_count","count","num_ratings"],
     "image_url": ["image_url","image","main_image","images","large","hi_res"],
@@ -214,6 +215,7 @@ def normalize_rows(df: pd.DataFrame) -> pd.DataFrame:
                 "description": clean_text(row[columns["description"]],default=title)
                 if columns["description"]
                 else title,
+                "price": clean_number(row[columns["price"]],None) if columns["price"] else None,
                 "average_rating": average_rating,
                 "rating_count": rating_count,
                 "image_url": extract_image_url(row[columns["image_url"]]) if columns["image_url"] else None,
@@ -284,6 +286,7 @@ def export_catalog(input_path: Path,output_path: Path,limit: int) -> pd.DataFram
             "title",
             "category",
             "description",
+            "price",
             "average_rating",
             "rating_count",
             "popularity_score",

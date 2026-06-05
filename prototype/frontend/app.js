@@ -4,6 +4,8 @@ const BASE_API_URL = "http://localhost:8000";
 //stato minimale condiviso dalla pagina catalogo
 const state = {
   categories: [],
+  currentProducts: [],
+  priceFilterActive: false,
 };
 
 //scegliamo quale pagina inizializzare in base al data attribute
@@ -34,6 +36,24 @@ async function initCatalogPage() {
   });
   //cambio categoria
   document.getElementById("categorySelect").addEventListener("change", runSearch);
+  //cambio ordinamento
+  document.getElementById("sortSelect").addEventListener("change", applyCatalogFilters);
+  //slider prezzo minimo
+  document.getElementById("minPriceInput").addEventListener("input", () => {
+    syncPriceRange("min");
+    applyCatalogFilters();
+  });
+  //slider prezzo massimo
+  document.getElementById("maxPriceInput").addEventListener("input", () => {
+    syncPriceRange("max");
+    applyCatalogFilters();
+  });
+  //filtro rating minimo
+  document.getElementById("minRatingSelect").addEventListener("change", applyCatalogFilters);
+  //filtro recensioni minime
+  document.getElementById("minReviewsInput").addEventListener("input", applyCatalogFilters);
+  //reset filtri laterali
+  document.getElementById("resetFiltersButton").addEventListener("click", resetFilters);
 }
 
 //inizializza la pagina dettaglio leggendo item_id dalla query string
@@ -79,13 +99,7 @@ async function loadCategories() {
 
 //carica i primi prodotti del catalogo
 async function loadInitialProducts() {
-  try {
-    const products = await fetchJson("/products?limit=30");
-    renderProducts("resultsGrid", products);
-    setResultsCount(products.length);
-  } catch (error) {
-    renderMessage("resultsGrid", "Backend non raggiungibile. Avvia FastAPI sulla porta 8000.");
-  }
+  await runSearch();
 }
 
 //carica la sezione prodotti popolari
@@ -102,7 +116,7 @@ async function loadPopularProducts() {
 async function runSearch() {
   const query = document.getElementById("searchInput").value.trim();
   const category = document.getElementById("categorySelect").value;
-  const params = new URLSearchParams({ q: query, limit: "30" });
+  const params = new URLSearchParams({ q: query, limit: "500" });
   //aggiungiamo categoria solo se selezionata
   if (category) {
     params.set("category", category);
@@ -110,11 +124,142 @@ async function runSearch() {
 
   try {
     const products = await fetchJson(`/search?${params.toString()}`);
-    renderProducts("resultsGrid", products);
-    setResultsCount(products.length);
+    state.currentProducts = products;
+    state.priceFilterActive = false;
+    updatePriceControls(products);
+    applyCatalogFilters();
   } catch (error) {
     renderMessage("resultsGrid", "Ricerca non disponibile.");
   }
+}
+
+//applica filtri e ordinamento lato frontend
+function applyCatalogFilters() {
+  let products = [...state.currentProducts];
+  const minRating = Number(document.getElementById("minRatingSelect").value || 0);
+  const minReviews = Number(document.getElementById("minReviewsInput").value || 0);
+
+  if (state.priceFilterActive) {
+    const minPrice = Number(document.getElementById("minPriceInput").value || 0);
+    const maxPrice = Number(document.getElementById("maxPriceInput").value || 0);
+    products = products.filter((product) => {
+      const price = normalizePrice(product.price);
+      return price !== null && price >= minPrice && price <= maxPrice;
+    });
+  }
+
+  if (minRating > 0) {
+    products = products.filter((product) => Number(product.average_rating || 0) >= minRating);
+  }
+
+  if (minReviews > 0) {
+    products = products.filter((product) => Number(product.rating_count || 0) >= minReviews);
+  }
+
+  products = sortProducts(products, document.getElementById("sortSelect").value);
+  renderProducts("resultsGrid", products);
+  setResultsCount(products.length, state.currentProducts.length);
+}
+
+//ordina i prodotti secondo la scelta utente
+function sortProducts(products, sortMode) {
+  const ordered = [...products];
+  if (sortMode === "price_asc") {
+    return ordered.sort((a, b) => priceForSort(a.price, false) - priceForSort(b.price, false));
+  }
+  if (sortMode === "price_desc") {
+    return ordered.sort((a, b) => priceForSort(b.price, true) - priceForSort(a.price, true));
+  }
+  if (sortMode === "rating_desc") {
+    return ordered.sort((a, b) => Number(b.average_rating || 0) - Number(a.average_rating || 0));
+  }
+  if (sortMode === "reviews_desc") {
+    return ordered.sort((a, b) => Number(b.rating_count || 0) - Number(a.rating_count || 0));
+  }
+  return ordered.sort((a, b) => Number(b.popularity_score || 0) - Number(a.popularity_score || 0));
+}
+
+//normalizza prezzi mancanti o non numerici
+function normalizePrice(value) {
+  const price = Number(value);
+  return Number.isFinite(price) && price > 0 ? price : null;
+}
+
+//mantiene i prodotti senza prezzo in fondo all'ordinamento
+function priceForSort(value, desc) {
+  const price = normalizePrice(value);
+  if (price === null) {
+    return desc ? -1 : Number.MAX_SAFE_INTEGER;
+  }
+  return price;
+}
+
+//aggiorna slider prezzo in base ai prodotti caricati
+function updatePriceControls(products) {
+  const minPriceInput = document.getElementById("minPriceInput");
+  const maxPriceInput = document.getElementById("maxPriceInput");
+  const prices = products.map((product) => normalizePrice(product.price)).filter((price) => price !== null);
+
+  if (!prices.length) {
+    minPriceInput.disabled = true;
+    maxPriceInput.disabled = true;
+    minPriceInput.value = "0";
+    maxPriceInput.value = "0";
+    updatePriceLabel(null, null);
+    return;
+  }
+
+  const minPrice = Math.floor(Math.min(...prices));
+  const maxPrice = Math.ceil(Math.max(...prices));
+  [minPriceInput, maxPriceInput].forEach((input) => {
+    input.disabled = false;
+    input.min = String(minPrice);
+    input.max = String(maxPrice);
+    input.step = "1";
+  });
+  minPriceInput.value = String(minPrice);
+  maxPriceInput.value = String(maxPrice);
+  updatePriceLabel(minPrice, maxPrice);
+}
+
+//sincronizza i due slider del prezzo
+function syncPriceRange(changedInput) {
+  const minPriceInput = document.getElementById("minPriceInput");
+  const maxPriceInput = document.getElementById("maxPriceInput");
+  let minPrice = Number(minPriceInput.value);
+  let maxPrice = Number(maxPriceInput.value);
+
+  if (minPrice > maxPrice && changedInput === "min") {
+    maxPrice = minPrice;
+    maxPriceInput.value = String(maxPrice);
+  }
+  if (maxPrice < minPrice && changedInput === "max") {
+    minPrice = maxPrice;
+    minPriceInput.value = String(minPrice);
+  }
+
+  state.priceFilterActive = true;
+  updatePriceLabel(minPrice, maxPrice);
+}
+
+//aggiorna etichetta del range prezzo
+function updatePriceLabel(minPrice, maxPrice) {
+  const label = document.getElementById("priceRangeLabel");
+  if (minPrice === null || maxPrice === null) {
+    label.textContent = "N/D";
+    return;
+  }
+  label.textContent = `${formatPrice(minPrice)} - ${formatPrice(maxPrice)}`;
+}
+
+//riporta i filtri al valore iniziale
+function resetFilters() {
+  document.getElementById("searchInput").value = "";
+  document.getElementById("categorySelect").value = "";
+  document.getElementById("sortSelect").value = "popularity_desc";
+  document.getElementById("minRatingSelect").value = "0";
+  document.getElementById("minReviewsInput").value = "";
+  runSearch();
 }
 
 //carica e renderizza il dettaglio prodotto
@@ -167,6 +312,7 @@ function createProductCard(product) {
   body.innerHTML = `
     <p class="category">${escapeHtml(product.category)}</p>
     <h3>${escapeHtml(product.title)}</h3>
+    <p class="${priceClassName(product.price)}">${escapeHtml(formatPrice(product.price))}</p>
     <div class="meta-row">
       <span>Rating ${formatRating(product.average_rating)}</span>
       <span>${Number(product.rating_count || 0).toLocaleString("it-IT")} recensioni</span>
@@ -202,6 +348,7 @@ function renderProductDetail(product) {
     <h2>${escapeHtml(product.title)}</h2>
     <p class="description">${escapeHtml(product.description || "Descrizione non disponibile.")}</p>
     <dl class="stats">
+      <div><dt>Prezzo</dt><dd>${escapeHtml(formatPrice(product.price))}</dd></div>
       <div><dt>Average rating</dt><dd>${formatRating(product.average_rating)}</dd></div>
       <div><dt>Rating count</dt><dd>${Number(product.rating_count || 0).toLocaleString("it-IT")}</dd></div>
       <div><dt>Popularity score</dt><dd>${Number(product.popularity_score || 0).toFixed(4)}</dd></div>
@@ -252,7 +399,11 @@ function renderMessage(containerId, message) {
 }
 
 //aggiorna il contatore dei risultati
-function setResultsCount(count) {
+function setResultsCount(count, total) {
+  if (total && total !== count) {
+    document.getElementById("resultsCount").textContent = `${count} di ${total} prodotti`;
+    return;
+  }
   document.getElementById("resultsCount").textContent = `${count} prodotti`;
 }
 
@@ -260,6 +411,23 @@ function setResultsCount(count) {
 function formatRating(value) {
   const number = Number(value || 0);
   return number > 0 ? number.toFixed(1) : "N/D";
+}
+
+//formatta il prezzo prodotto
+function formatPrice(value) {
+  const price = normalizePrice(value);
+  if (price === null) {
+    return "Prezzo non disponibile";
+  }
+  return price.toLocaleString("it-IT", {
+    style: "currency",
+    currency: "USD",
+  });
+}
+
+//classe CSS diversa quando manca il prezzo
+function priceClassName(value) {
+  return normalizePrice(value) === null ? "price-row muted-price" : "price-row";
 }
 
 //escapa testo prima di inserirlo in HTML

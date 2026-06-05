@@ -36,7 +36,7 @@ def health() -> HealthResponse:
 #endpoint catalogo con paginazione e filtro categoria
 @app.get("/products",response_model=list[Product])
 def products(
-    limit: int=Query(default=30,ge=1,le=200),
+    limit: int=Query(default=30,ge=1,le=600),
     offset: int=Query(default=0,ge=0),
     category: str | None=None,
 ) -> list[Product]:
@@ -70,7 +70,7 @@ def popular(limit: int=Query(default=20,ge=1,le=200)) -> list[Product]:
 def search(
     q: str="",
     category: str | None=None,
-    limit: int=Query(default=30,ge=1,le=200),
+    limit: int=Query(default=30,ge=1,le=600),
 ) -> list[Product]:
     return search_products(
         products=catalog.all_products(),

@@ -17,37 +17,80 @@
 
     <!--contenuto principale della home catalogo-->
     <main class="page-shell">
-      <!--barra ricerca e filtro categoria-->
-      <section class="toolbar" aria-label="Ricerca prodotti">
-        <label class="field">
-          <span>Ricerca</span>
-          <input id="searchInput" type="search" placeholder="Cerca per titolo, categoria o descrizione">
-        </label>
-        <label class="field">
-          <span>Categoria</span>
-          <select id="categorySelect">
-            <option value="">Tutte le categorie</option>
-          </select>
-        </label>
-        <button id="searchButton" class="primary-button" type="button">Cerca</button>
-      </section>
+      <div class="catalog-layout">
+        <!--filtri laterali del catalogo-->
+        <aside class="filter-panel" aria-label="Filtri catalogo">
+          <h2>Filtri</h2>
+          <label class="field">
+            <span>Ricerca</span>
+            <input id="searchInput" type="search" placeholder="Titolo, categoria o descrizione">
+          </label>
+          <label class="field">
+            <span>Categoria</span>
+            <select id="categorySelect">
+              <option value="">Tutte le categorie</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Ordina per</span>
+            <select id="sortSelect">
+              <option value="popularity_desc">Popolarità</option>
+              <option value="price_asc">Prezzo crescente</option>
+              <option value="price_desc">Prezzo decrescente</option>
+              <option value="rating_desc">Rating migliore</option>
+              <option value="reviews_desc">Più recensioni</option>
+            </select>
+          </label>
+          <div class="filter-group">
+            <div class="filter-title">
+              <span>Prezzo</span>
+              <span id="priceRangeLabel">N/D</span>
+            </div>
+            <label class="field compact-field">
+              <span>Da</span>
+              <input id="minPriceInput" type="range" min="0" max="0" value="0" disabled>
+            </label>
+            <label class="field compact-field">
+              <span>A</span>
+              <input id="maxPriceInput" type="range" min="0" max="0" value="0" disabled>
+            </label>
+          </div>
+          <label class="field">
+            <span>Rating minimo</span>
+            <select id="minRatingSelect">
+              <option value="0">Qualsiasi rating</option>
+              <option value="4.5">Da 4.5 in su</option>
+              <option value="4">Da 4.0 in su</option>
+              <option value="3.5">Da 3.5 in su</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Recensioni minime</span>
+            <input id="minReviewsInput" type="number" min="0" step="100" placeholder="Es. 1000">
+          </label>
+          <button id="searchButton" class="primary-button" type="button">Applica</button>
+          <button id="resetFiltersButton" class="light-button" type="button">Reset</button>
+        </aside>
 
-      <!--griglia risultati ricerca-->
-      <section class="content-section">
-        <div class="section-heading">
-          <h2>Risultati</h2>
-          <p id="resultsCount"></p>
-        </div>
-        <div id="resultsGrid" class="product-grid"></div>
-      </section>
+        <div class="results-area">
+          <!--griglia risultati ricerca-->
+          <section class="content-section first-section">
+            <div class="section-heading">
+              <h2>Risultati</h2>
+              <p id="resultsCount"></p>
+            </div>
+            <div id="resultsGrid" class="product-grid"></div>
+          </section>
 
-      <!--griglia prodotti ordinati per popolarita-->
-      <section class="content-section">
-        <div class="section-heading">
-          <h2>Prodotti popolari</h2>
+          <!--griglia prodotti ordinati per popolarita-->
+          <section class="content-section">
+            <div class="section-heading">
+              <h2>Prodotti popolari</h2>
+            </div>
+            <div id="popularGrid" class="product-grid compact-grid"></div>
+          </section>
         </div>
-        <div id="popularGrid" class="product-grid"></div>
-      </section>
+      </div>
     </main>
 
     <!--logica frontend vanilla JS-->

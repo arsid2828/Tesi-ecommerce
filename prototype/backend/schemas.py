@@ -7,6 +7,7 @@ class Product(BaseModel): #singolo prodotto
     title: str
     category: str
     description: str | None=None
+    price: float | None=None
     average_rating: float | None=None
     rating_count: int=0
     popularity_score: float=0.0
