@@ -1,0 +1,356 @@
+/*variabili locali estensione*/
+:root {
+  --extension-bg: #f3f5f7;
+  --extension-surface: #ffffff;
+  --extension-surface-soft: #f7f9fb;
+  --extension-text: #18222d;
+  --extension-muted: #667381;
+  --extension-line: #d9e0e8;
+  --extension-accent: #0b7a75;
+  --extension-accent-dark: #095f5b;
+  --extension-error: #9b1c1c;
+  --extension-error-bg: #fff1f1;
+  --extension-shadow: 0 10px 24px rgba(24, 34, 45, 0.1);
+}
+
+/*stile popup estensione*/
+body.extension-popup {
+  width: 380px;
+  min-height: 520px;
+  margin: 0;
+  background: var(--extension-bg);
+  color: var(--extension-text);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  line-height: 1.45;
+}
+
+/*box model popup*/
+body.extension-popup * {
+  box-sizing: border-box;
+}
+
+/*contenitore popup*/
+body.extension-popup .popup-shell {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+/*header popup*/
+body.extension-popup .popup-header {
+  background: #182632;
+  color: #fff;
+  border-bottom: 4px solid var(--extension-accent);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+/*eyebrow popup*/
+body.extension-popup .popup-kicker {
+  margin: 0 0 4px;
+  color: #cbd5df;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/*titolo popup*/
+body.extension-popup .popup-header h1 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+/*sezione popup*/
+body.extension-popup .popup-section {
+  display: grid;
+  gap: 8px;
+  background: var(--extension-surface);
+  border: 1px solid var(--extension-line);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: var(--extension-shadow);
+}
+
+/*intestazione sezione*/
+body.extension-popup .section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/*titolo sezione*/
+body.extension-popup .section-heading h2 {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: 0;
+}
+
+/*etichette piccole*/
+body.extension-popup .label,
+body.extension-popup .small-muted,
+body.extension-popup .muted-text {
+  margin: 0;
+  color: var(--extension-muted);
+  font-size: 13px;
+}
+
+/*URL tab corrente*/
+body.extension-popup .url-value {
+  margin: 0;
+  color: var(--extension-text);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+/*valore item_id*/
+body.extension-popup .item-id-value {
+  margin: 0;
+  padding: 8px;
+  background: var(--extension-surface-soft);
+  border: 1px solid var(--extension-line);
+  border-radius: 6px;
+  color: var(--extension-text);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/*stato backend*/
+body.extension-popup .status-pill {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/*stato in controllo*/
+body.extension-popup .status-muted {
+  background: var(--extension-surface-soft);
+  color: var(--extension-muted);
+}
+
+/*stato online*/
+body.extension-popup .status-online {
+  background: #e7f6f2;
+  color: var(--extension-accent-dark);
+}
+
+/*stato offline*/
+body.extension-popup .status-offline {
+  background: var(--extension-error-bg);
+  color: var(--extension-error);
+}
+
+/*bottone principale*/
+body.extension-popup .primary-button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--extension-accent);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+/*hover bottone*/
+body.extension-popup .primary-button:hover {
+  background: var(--extension-accent-dark);
+}
+
+/*bottone disabilitato*/
+body.extension-popup .primary-button:disabled {
+  background: #aeb8c2;
+  cursor: not-allowed;
+}
+
+/*focus accessibile*/
+body.extension-popup .primary-button:focus-visible {
+  outline: 3px solid rgba(11, 122, 117, 0.2);
+  outline-offset: 2px;
+}
+
+/*risultato prodotto*/
+body.extension-popup .result-box {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 10px;
+  background: var(--extension-surface-soft);
+  border: 1px solid var(--extension-line);
+  border-radius: 6px;
+}
+
+/*titolo risultato*/
+body.extension-popup .result-box h2 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.3;
+  letter-spacing: 0;
+}
+
+/*testi risultato*/
+body.extension-popup .result-box p {
+  margin: 0;
+  font-size: 13px;
+}
+
+/*layout dettaglio prodotto nel popup*/
+body.extension-popup .popup-product-layout {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+/*testi dettaglio prodotto*/
+body.extension-popup .popup-product-info {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+/*immagine prodotto caricata*/
+body.extension-popup .popup-product-image {
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--extension-line);
+  border-radius: 6px;
+}
+
+/*miniatura raccomandazione*/
+body.extension-popup .recommendation-image {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--extension-line);
+  border-radius: 6px;
+}
+
+/*immagini prodotto nel popup*/
+body.extension-popup .popup-product-image img,
+body.extension-popup .recommendation-image img {
+  display: block;
+  max-width: calc(100% - 8px);
+  max-height: calc(100% - 8px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+/*fallback immagine popup*/
+body.extension-popup .image-placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 6px;
+  background: var(--extension-surface-soft);
+  color: var(--extension-muted);
+  font-size: 10px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+/*categoria risultato*/
+body.extension-popup .category-line {
+  color: var(--extension-accent-dark);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/*testo errore*/
+body.extension-popup .error-text {
+  color: var(--extension-error);
+}
+
+/*lista raccomandazioni*/
+body.extension-popup .recommendations-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/*singola raccomandazione*/
+body.extension-popup .recommendations-list li {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+  background: var(--extension-surface-soft);
+  border: 1px solid var(--extension-line);
+  border-radius: 6px;
+}
+
+/*raccomandazione con miniatura*/
+body.extension-popup .recommendation-item {
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: center;
+}
+
+/*testi raccomandazione*/
+body.extension-popup .recommendation-body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+/*titolo raccomandazione*/
+body.extension-popup .recommendations-list span {
+  color: var(--extension-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/*metadati raccomandazione*/
+body.extension-popup .recommendations-list small,
+body.extension-popup .empty-list-item {
+  color: var(--extension-muted);
+  font-size: 12px;
+}
+
+/*box iniettato nella pagina prodotto*/
+.thesis-extension-box {
+  display: grid;
+  gap: 5px;
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  background: #ffffff;
+  border: 1px solid #d9e0e8;
+  border-left: 4px solid #0b7a75;
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(24, 34, 45, 0.08);
+  color: #18222d;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+/*titolo box iniettato*/
+.thesis-extension-box strong {
+  font-size: 15px;
+}
+
+/*testi box iniettato*/
+.thesis-extension-box span {
+  color: #667381;
+}
+
+/*stato backend nel box pagina*/
+.thesis-extension-box .thesis-extension-status {
+  color: #095f5b;
+  font-weight: 700;
+}

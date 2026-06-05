@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Tesi E-commerce Demo",
+  "version": "0.1.0",
+  "description": "Estensione Chrome locale per collegare il prototipo e-commerce al backend FastAPI.",
+  "permissions": [
+    "activeTab",
+    "tabs"
+  ],
+  "host_permissions": [
+    "http://localhost:8000/*",
+    "http://localhost:3000/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Tesi E-commerce Demo"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost:3000/product.html*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "style.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
