@@ -1,4 +1,4 @@
-/* Variabili visive globali */
+/*variabili visive globali*/
 :root {
   --bg: #f6f7f9;
   --surface: #ffffff;
@@ -11,12 +11,12 @@
   --shadow: 0 10px 26px rgba(31, 41, 51, 0.08);
 }
 
-/* Reset base box model */
+/*reset base box model*/
 * {
   box-sizing: border-box;
 }
 
-/* Stile pagina generale */
+/*stile pagina generale*/
 body {
   margin: 0;
   background: var(--bg);
@@ -24,26 +24,26 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Header principale */
+/*header principale*/
 .site-header {
   background: #23313d;
   color: #fff;
   padding: 28px clamp(16px, 4vw, 48px);
 }
 
-/* Header compatto per pagina dettaglio */
+/*header compatto per pagina dettaglio*/
 .site-header.compact {
   padding-bottom: 24px;
 }
 
-/* Titolo header */
+/*titolo header*/
 .site-header h1 {
   margin: 0 0 8px;
   font-size: clamp(28px, 4vw, 42px);
   font-weight: 700;
 }
 
-/* Testi secondari */
+/*testi secondari*/
 .intro,
 .section-heading p,
 .category {
@@ -51,18 +51,18 @@ body {
   color: var(--muted);
 }
 
-/* Testo secondario dentro header */
+/*testo secondario dentro header*/
 .site-header .intro {
   color: #cbd5df;
 }
 
-/* Contenitore centrale pagina */
+/*contenitore centrale pagina*/
 .page-shell {
   width: min(1180px, calc(100% - 32px));
   margin: 24px auto 48px;
 }
 
-/* Barra ricerca e filtri */
+/*barra ricerca e filtri*/
 .toolbar {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) minmax(180px, 280px) auto;
@@ -75,7 +75,7 @@ body {
   box-shadow: var(--shadow);
 }
 
-/* Campo form con label */
+/*campo form con label*/
 .field {
   display: grid;
   gap: 6px;
@@ -83,7 +83,7 @@ body {
   font-size: 14px;
 }
 
-/* Controlli form e bottoni */
+/*controlli form e bottoni*/
 input,
 select,
 button {
@@ -92,7 +92,7 @@ button {
   font: inherit;
 }
 
-/* Input e select */
+/*input e select*/
 input,
 select {
   width: 100%;
@@ -102,26 +102,26 @@ select {
   padding: 0 12px;
 }
 
-/* Stile base bottoni */
+/*stile base bottoni*/
 button {
   border: 0;
   cursor: pointer;
   font-weight: 700;
 }
 
-/* Bottone principale ricerca */
+/*bottone principale ricerca*/
 .primary-button {
   background: var(--accent);
   color: #fff;
   padding: 0 22px;
 }
 
-/* Hover bottone principale */
+/*hover bottone principale*/
 .primary-button:hover {
   background: var(--accent-dark);
 }
 
-/* Bottone dettaglio prodotto */
+/*bottone dettaglio prodotto*/
 .secondary-button {
   width: 100%;
   background: #23313d;
@@ -129,12 +129,12 @@ button {
   margin-top: auto;
 }
 
-/* Sezioni contenuto */
+/*sezioni contenuto*/
 .content-section {
   margin-top: 28px;
 }
 
-/* Header delle sezioni */
+/*header delle sezioni*/
 .section-heading {
   display: flex;
   align-items: baseline;
@@ -143,20 +143,20 @@ button {
   margin-bottom: 12px;
 }
 
-/* Titoli sezione */
+/*titoli sezione*/
 .section-heading h2 {
   margin: 0;
   font-size: 22px;
 }
 
-/* Griglia card prodotto */
+/*griglia card prodotto*/
 .product-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 18px;
 }
 
-/* Card prodotto */
+/*card prodotto*/
 .product-card {
   display: flex;
   flex-direction: column;
@@ -168,7 +168,7 @@ button {
   box-shadow: var(--shadow);
 }
 
-/* Contenitori immagine */
+/*contenitori immagine*/
 .product-image,
 .detail-image {
   display: grid;
@@ -176,7 +176,7 @@ button {
   background: var(--surface-soft);
 }
 
-/* Box immagine nelle card */
+/*box immagine nelle card*/
 .product-image {
   flex: 0 0 190px;
   height: 190px;
@@ -184,7 +184,7 @@ button {
   border-bottom: 1px solid var(--line);
 }
 
-/* Immagini prodotto nelle card */
+/*immagini prodotto nelle card*/
 .product-image img {
   display: block;
   max-width: 100%;
@@ -195,7 +195,7 @@ button {
   padding: 10px;
 }
 
-/* Immagine grande nella pagina dettaglio */
+/*immagine grande nella pagina dettaglio*/
 .detail-image img {
   width: 100%;
   height: 100%;
@@ -203,7 +203,7 @@ button {
   padding: 12px;
 }
 
-/* Placeholder quando manca immagine */
+/*placeholder quando manca immagine*/
 .image-placeholder {
   display: grid;
   place-items: center;
@@ -218,7 +218,7 @@ button {
     var(--surface-soft);
 }
 
-/* Corpo testuale della card */
+/*corpo testuale della card*/
 .card-body {
   display: flex;
   flex: 1;
@@ -228,7 +228,7 @@ button {
   background: var(--surface);
 }
 
-/* Titolo prodotto in card */
+/*titolo prodotto in card*/
 .card-body h3 {
   margin: 0;
   font-size: 16px;
@@ -239,14 +239,14 @@ button {
   -webkit-line-clamp: 5;
 }
 
-/* Categoria prodotto */
+/*categoria prodotto*/
 .category {
   color: var(--accent-dark);
   font-size: 13px;
   font-weight: 700;
 }
 
-/* Metadati rating e recensioni */
+/*metadati rating e recensioni*/
 .meta-row {
   display: grid;
   gap: 4px;
@@ -254,7 +254,7 @@ button {
   font-size: 14px;
 }
 
-/* Layout dettaglio prodotto */
+/*layout dettaglio prodotto*/
 .product-detail {
   display: grid;
   grid-template-columns: minmax(260px, 420px) 1fr;
@@ -266,7 +266,7 @@ button {
   box-shadow: var(--shadow);
 }
 
-/* Box immagine dettaglio */
+/*box immagine dettaglio*/
 .detail-image {
   min-height: 360px;
   border-radius: 8px;
@@ -274,20 +274,20 @@ button {
   overflow: hidden;
 }
 
-/* Titolo dettaglio */
+/*titolo dettaglio*/
 .detail-info h2 {
   margin: 6px 0 14px;
   font-size: 28px;
   line-height: 1.2;
 }
 
-/* Descrizione prodotto */
+/*descrizione prodotto*/
 .description {
   color: #3a4652;
   line-height: 1.6;
 }
 
-/* Griglia statistiche dettaglio */
+/*griglia statistiche dettaglio*/
 .stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(120px, 1fr));
@@ -295,39 +295,39 @@ button {
   margin: 24px 0 0;
 }
 
-/* Singola statistica */
+/*singola statistica*/
 .stats div {
   background: var(--surface-soft);
   border-radius: 8px;
   padding: 12px;
 }
 
-/* Etichetta statistica */
+/*etichetta statistica*/
 .stats dt {
   color: var(--muted);
   font-size: 13px;
 }
 
-/* Valore statistica */
+/*valore statistica*/
 .stats dd {
   margin: 4px 0 0;
   font-size: 20px;
   font-weight: 700;
 }
 
-/* Link ritorno catalogo */
+/*link ritorno catalogo*/
 .back-link {
   color: #fff;
   text-decoration: none;
   font-weight: 700;
 }
 
-/* Hover link ritorno */
+/*hover link ritorno*/
 .back-link:hover {
   text-decoration: underline;
 }
 
-/* Stato vuoto delle griglie */
+/*stato vuoto delle griglie*/
 .empty-state {
   grid-column: 1 / -1;
   margin: 0;
@@ -339,20 +339,20 @@ button {
   text-align: center;
 }
 
-/* Layout mobile */
+/*layout mobile*/
 @media (max-width: 760px) {
-  /* Stack verticale su schermi stretti */
+  /*stack verticale su schermi stretti*/
   .toolbar,
   .product-detail {
     grid-template-columns: 1fr;
   }
 
-  /* Bottone ricerca a larghezza piena */
+  /*bottone ricerca a larghezza piena*/
   .primary-button {
     width: 100%;
   }
 
-  /* Statistiche dettaglio in colonna */
+  /*statistiche dettaglio in colonna*/
   .stats {
     grid-template-columns: 1fr;
   }

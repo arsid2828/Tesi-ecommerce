@@ -1,8 +1,8 @@
 from pydantic import BaseModel
 
 
-#Schema prodotto usato da API e catalogo JSON
-class Product(BaseModel):
+#schema prodotto usato da API e catalogo JSON
+class Product(BaseModel): #singolo prodotto
     item_id: str
     title: str
     category: str
@@ -13,12 +13,12 @@ class Product(BaseModel):
     image_url: str | None=None
 
 
-#Schema categoria con numero di prodotti
+#schema categoria con numero di prodotti
 class CategorySummary(BaseModel):
     category: str
     count: int
 
 
-#Schema risposta per health check
+#schema risposta per health check
 class HealthResponse(BaseModel):
     status: str

@@ -55,7 +55,6 @@ Endpoint principali:
 - `GET /categories`
 - `GET /popular?limit=20`
 - `GET /search?q=...&category=...&limit=30`
-- `GET /recommendations/popular?limit=10`
 
 ## Avviare il frontend
 
@@ -84,4 +83,3 @@ http://localhost:3000
 - Integrare una pagina di confronto tra MostPopular, content-based e modelli collaborativi.
 - Aggiungere logging delle query e valutazione della product discovery.
 - Passare a un backend dati piu strutturato solo quando il prototipo cresce.
-
