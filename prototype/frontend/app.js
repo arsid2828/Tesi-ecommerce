@@ -6,6 +6,7 @@ const state = {
   categories: [],
   currentProducts: [],
   priceFilterActive: false,
+  aiSearch: null,
 };
 
 //scegliamo quale pagina inizializzare in base al data attribute
@@ -30,6 +31,11 @@ async function initCatalogPage() {
   document.getElementById("searchButton").addEventListener("click", runSearch);
   //invio nella barra di ricerca
   document.getElementById("searchInput").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      runSearch();
+    }
+  });
+  document.getElementById("aiQuestionInput").addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       runSearch();
     }
@@ -79,6 +85,21 @@ async function fetchJson(path) {
   return response.json();
 }
 
+//wrapper per chiamate POST JSON al backend
+async function postJson(path, body) {
+  const response = await fetch(`${BASE_API_URL}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(`Errore API: ${response.status}`);
+  }
+  return response.json();
+}
+
 //carica categorie e popola il filtro select
 async function loadCategories() {
   try {
@@ -115,6 +136,7 @@ async function loadPopularProducts() {
 //esegue ricerca testuale con eventuale filtro categoria
 async function runSearch() {
   const query = document.getElementById("searchInput").value.trim();
+  const question = document.getElementById("aiQuestionInput").value.trim();
   const category = document.getElementById("categorySelect").value;
   const params = new URLSearchParams({ q: query, limit: "500" });
   //aggiungiamo categoria solo se selezionata
@@ -123,13 +145,44 @@ async function runSearch() {
   }
 
   try {
-    const products = await fetchJson(`/search?${params.toString()}`);
+    state.aiSearch = null;
+    const products = question
+      ? await runAiSearch(query, question, category)
+      : await fetchJson(`/search?${params.toString()}`);
     state.currentProducts = products;
     state.priceFilterActive = false;
     updatePriceControls(products);
     applyCatalogFilters();
   } catch (error) {
     renderMessage("resultsGrid", "Ricerca non disponibile.");
+  }
+}
+
+//usa Gemini solo quando l'utente ha scritto una domanda/esigenza
+async function runAiSearch(query, question, category) {
+  try {
+    const response = await postJson("/ai-search", {
+      query,
+      question,
+      category: category || null,
+      limit: 30,
+    });
+    state.aiSearch = {
+      answer: response.answer,
+      fallback: Boolean(response.fallback),
+    };
+    return response.results || [];
+  } catch (error) {
+    console.error(error);
+    state.aiSearch = {
+      answer: "Ricerca AI non disponibile, mostrati risultati locali.",
+      fallback: true,
+    };
+    const params = new URLSearchParams({ q: query, limit: "500" });
+    if (category) {
+      params.set("category", category);
+    }
+    return fetchJson(`/search?${params.toString()}`);
   }
 }
 
@@ -156,9 +209,18 @@ function applyCatalogFilters() {
     products = products.filter((product) => Number(product.rating_count || 0) >= minReviews);
   }
 
-  products = sortProducts(products, document.getElementById("sortSelect").value);
+  const sortMode = document.getElementById("sortSelect").value;
+  if (!hasAiOrder(products) || sortMode !== "popularity_desc") {
+    products = sortProducts(products, sortMode);
+  }
+  renderAiSearchNotice();
   renderProducts("resultsGrid", products);
   setResultsCount(products.length, state.currentProducts.length);
+}
+
+//riconosce risultati gia ordinati da Gemini
+function hasAiOrder(products) {
+  return products.some((product) => product.ai_score !== null && product.ai_score !== undefined);
 }
 
 //ordina i prodotti secondo la scelta utente
@@ -255,6 +317,7 @@ function updatePriceLabel(minPrice, maxPrice) {
 //riporta i filtri al valore iniziale
 function resetFilters() {
   document.getElementById("searchInput").value = "";
+  document.getElementById("aiQuestionInput").value = "";
   document.getElementById("categorySelect").value = "";
   document.getElementById("sortSelect").value = "popularity_desc";
   document.getElementById("minRatingSelect").value = "0";
@@ -299,6 +362,28 @@ function renderProducts(containerId, products) {
   });
 }
 
+//mostra risposta AI o avviso fallback sopra la griglia risultati
+function renderAiSearchNotice() {
+  const notice = document.getElementById("aiSearchNotice");
+  if (!notice) {
+    return;
+  }
+  if (!state.aiSearch) {
+    notice.classList.add("hidden");
+    notice.innerHTML = "";
+    return;
+  }
+
+  const title = state.aiSearch.fallback ? "Avviso" : "Risposta AI";
+  notice.className = state.aiSearch.fallback
+    ? "ai-search-notice fallback"
+    : "ai-search-notice";
+  notice.innerHTML = `
+    <strong>${escapeHtml(title)}</strong>
+    <p>${escapeHtml(state.aiSearch.answer || "")}</p>
+  `;
+}
+
 //crea una card prodotto riutilizzabile
 function createProductCard(product) {
   const card = document.createElement("article");
@@ -318,6 +403,13 @@ function createProductCard(product) {
       <span>${Number(product.rating_count || 0).toLocaleString("it-IT")} recensioni</span>
     </div>
   `;
+
+  if (product.ai_reason) {
+    const reason = document.createElement("p");
+    reason.className = "ai-reason";
+    reason.innerHTML = `<strong>Perche consigliato:</strong> ${escapeHtml(product.ai_reason)}`;
+    body.appendChild(reason);
+  }
 
   //bottone verso pagina dettaglio
   const button = document.createElement("button");

@@ -23,3 +23,27 @@ class CategorySummary(BaseModel):
 #schema risposta per health check
 class HealthResponse(BaseModel):
     status: str
+
+
+#richiesta per ricerca assistita da Gemini
+class AISearchRequest(BaseModel):
+    query: str=""
+    question: str | None=None
+    category: str | None=None
+    limit: int=10
+
+
+#risultato prodotto con spiegazione AI opzionale
+class AISearchResult(Product):
+    ai_score: float | None=None
+    ai_reason: str | None=None
+
+
+#risposta completa del nuovo endpoint AI
+class AISearchResponse(BaseModel):
+    query: str
+    question: str | None=None
+    mode: str
+    answer: str
+    results: list[AISearchResult]
+    fallback: bool=False

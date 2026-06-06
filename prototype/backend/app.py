@@ -3,8 +3,9 @@ from pathlib import Path
 from fastapi import FastAPI,HTTPException,Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from prototype.backend.schemas import CategorySummary,HealthResponse,Product
+from prototype.backend.schemas import AISearchRequest,AISearchResponse,CategorySummary,HealthResponse,Product
 from prototype.backend.services.catalog_service import CatalogService
+from prototype.backend.services.ai_search_service import ai_search_products
 from prototype.backend.services.search_service import search_products
 
 
@@ -77,6 +78,18 @@ def search(
         query=q,
         category=category,
         limit=limit,
+    )
+
+
+#endpoint ricerca assistita da Gemini con fallback locale
+@app.post("/ai-search",response_model=AISearchResponse)
+def ai_search(request: AISearchRequest) -> AISearchResponse:
+    return ai_search_products(
+        products=catalog.all_products(),
+        query=request.query,
+        question=request.question,
+        category=request.category,
+        limit=request.limit,
     )
 
 

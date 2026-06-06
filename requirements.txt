@@ -1,6 +1,7 @@
 # Dipendenze del progetto
 datasets==3.6.0
 fastapi
+google-genai
 pandas
 pydantic
 pyarrow

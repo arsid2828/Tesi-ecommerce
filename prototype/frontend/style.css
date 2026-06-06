@@ -330,6 +330,36 @@ button {
   border-radius: 999px;
 }
 
+/*risposta sintetica della ricerca AI*/
+.ai-search-notice {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  color: #24433f;
+  background: var(--accent-soft);
+  border: 1px solid #b9ddd8;
+  border-radius: 8px;
+}
+
+.ai-search-notice.fallback {
+  color: #5c4520;
+  background: var(--highlight-soft);
+  border-color: #efd38a;
+}
+
+.ai-search-notice.hidden {
+  display: none;
+}
+
+.ai-search-notice strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.ai-search-notice p {
+  margin: 0;
+  color: inherit;
+}
+
 /*griglia card prodotto*/
 .product-grid {
   display: grid;
@@ -478,6 +508,22 @@ button {
   color: var(--muted);
   font-size: 14px;
   margin-bottom: 4px;
+}
+
+/*motivazione AI sulla card prodotto*/
+.ai-reason {
+  margin: 0;
+  padding: 10px;
+  color: #24433f;
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.ai-reason strong {
+  display: block;
+  margin-bottom: 2px;
 }
 
 /*prezzo prodotto nella card*/

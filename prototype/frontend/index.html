@@ -26,6 +26,10 @@
             <input id="searchInput" type="search" placeholder="Titolo, categoria o descrizione">
           </label>
           <label class="field">
+            <span>Domanda o esigenza opzionale</span>
+            <input id="aiQuestionInput" type="text" placeholder="Es. mi serve per studiare, deve essere economico e con buone recensioni">
+          </label>
+          <label class="field">
             <span>Categoria</span>
             <select id="categorySelect">
               <option value="">Tutte le categorie</option>
@@ -79,6 +83,7 @@
               <h2>Risultati</h2>
               <p id="resultsCount"></p>
             </div>
+            <div id="aiSearchNotice" class="ai-search-notice hidden"></div>
             <div id="resultsGrid" class="product-grid"></div>
           </section>
 
