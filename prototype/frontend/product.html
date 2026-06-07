@@ -18,6 +18,22 @@
       <!--dettaglio prodotto caricato via API-->
       <section id="productDetail" class="product-detail"></section>
 
+      <!--chat QA grounded sui dati del prodotto-->
+      <section class="content-section qa-section" aria-labelledby="qaTitle">
+        <div class="section-heading">
+          <h2 id="qaTitle">Domande sul prodotto</h2>
+        </div>
+        <form id="qaForm" class="qa-form">
+          <label class="field">
+            <span>Domanda</span>
+            <input id="qaQuestionInput" type="text" placeholder="Es. La batteria dura tanto?">
+          </label>
+          <button id="qaSubmitButton" class="primary-button" type="submit">Chiedi</button>
+        </form>
+        <div id="qaAnswer" class="qa-answer hidden"></div>
+        <div id="qaEvidence" class="qa-evidence hidden"></div>
+      </section>
+
       <!--raccomandazioni baseline MostPopular-->
       <section class="content-section">
         <div class="section-heading">

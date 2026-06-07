@@ -7,6 +7,7 @@ const state = {
   currentProducts: [],
   priceFilterActive: false,
   aiSearch: null,
+  clusteredSearch: null,
 };
 
 //scegliamo quale pagina inizializzare in base al data attribute
@@ -42,6 +43,8 @@ async function initCatalogPage() {
   });
   //cambio categoria
   document.getElementById("categorySelect").addEventListener("change", runSearch);
+  //attiva/disattiva clustering dei risultati lato backend
+  document.getElementById("clusterSearchCheckbox").addEventListener("change", runSearch);
   //cambio ordinamento
   document.getElementById("sortSelect").addEventListener("change", applyCatalogFilters);
   //slider prezzo minimo
@@ -69,9 +72,11 @@ async function initProductPage() {
   //senza id non possiamo caricare il prodotto
   if (!itemId) {
     renderMessage("productDetail", "Prodotto non specificato.");
+    disableProductQa();
     return;
   }
 
+  setupProductQa(itemId);
   await Promise.all([loadProductDetail(itemId), loadRecommendations()]);
 }
 
@@ -138,6 +143,7 @@ async function runSearch() {
   const query = document.getElementById("searchInput").value.trim();
   const question = document.getElementById("aiQuestionInput").value.trim();
   const category = document.getElementById("categorySelect").value;
+  const clusteringEnabled = document.getElementById("clusterSearchCheckbox").checked;
   const params = new URLSearchParams({ q: query, limit: "500" });
   //aggiungiamo categoria solo se selezionata
   if (category) {
@@ -146,9 +152,16 @@ async function runSearch() {
 
   try {
     state.aiSearch = null;
-    const products = question
-      ? await runAiSearch(query, question, category)
-      : await fetchJson(`/search?${params.toString()}`);
+    state.clusteredSearch = null;
+    let products = [];
+    if (clusteringEnabled) {
+      state.clusteredSearch = await runClusteredSearch(query, category);
+      products = flattenClusterProducts(state.clusteredSearch);
+    } else {
+      products = question
+        ? await runAiSearch(query, question, category)
+        : await fetchJson(`/search?${params.toString()}`);
+    }
     state.currentProducts = products;
     state.priceFilterActive = false;
     updatePriceControls(products);
@@ -186,6 +199,22 @@ async function runAiSearch(query, question, category) {
   }
 }
 
+//richiede al backend cluster calcolati sui risultati della ricerca locale
+async function runClusteredSearch(query, category) {
+  return postJson("/search/clustered", {
+    query,
+    category: category || null,
+    limit: 500,
+    use_ai_labels: true,
+  });
+}
+
+//appiattiamo solo per riusare filtri prezzo/rating gia presenti nel frontend
+function flattenClusterProducts(clusteredSearch) {
+  const clusters = clusteredSearch.clusters || [];
+  return clusters.flatMap((cluster) => cluster.products || []);
+}
+
 //applica filtri e ordinamento lato frontend
 function applyCatalogFilters() {
   let products = [...state.currentProducts];
@@ -214,8 +243,27 @@ function applyCatalogFilters() {
     products = sortProducts(products, sortMode);
   }
   renderAiSearchNotice();
-  renderProducts("resultsGrid", products);
+  if (state.clusteredSearch) {
+    const clusters = filterAndSortClusters(state.clusteredSearch.clusters || [], products, sortMode);
+    renderClusters("resultsGrid", clusters);
+  } else {
+    renderProducts("resultsGrid", products);
+  }
   setResultsCount(products.length, state.currentProducts.length);
+}
+
+//applica filtri e ordinamento ai prodotti interni a ogni cluster
+function filterAndSortClusters(clusters, visibleProducts, sortMode) {
+  const visibleIds = new Set(visibleProducts.map((product) => product.item_id));
+  return clusters
+    .map((cluster) => {
+      const products = (cluster.products || []).filter((product) => visibleIds.has(product.item_id));
+      return {
+        ...cluster,
+        products: sortProducts(products, sortMode),
+      };
+    })
+    .filter((cluster) => cluster.products.length > 0);
 }
 
 //riconosce risultati gia ordinati da Gemini
@@ -319,6 +367,7 @@ function resetFilters() {
   document.getElementById("searchInput").value = "";
   document.getElementById("aiQuestionInput").value = "";
   document.getElementById("categorySelect").value = "";
+  document.getElementById("clusterSearchCheckbox").checked = false;
   document.getElementById("sortSelect").value = "popularity_desc";
   document.getElementById("minRatingSelect").value = "0";
   document.getElementById("minReviewsInput").value = "";
@@ -332,6 +381,7 @@ async function loadProductDetail(itemId) {
     renderProductDetail(product);
   } catch (error) {
     renderMessage("productDetail", "Prodotto non trovato.");
+    disableProductQa();
   }
 }
 
@@ -345,9 +395,109 @@ async function loadRecommendations() {
   }
 }
 
+//collega la form QA al prodotto corrente
+function setupProductQa(itemId) {
+  const form = document.getElementById("qaForm");
+  if (!form) {
+    return;
+  }
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    askProductQuestion(itemId);
+  });
+}
+
+function disableProductQa() {
+  const section = document.querySelector(".qa-section");
+  if (section) {
+    section.classList.add("hidden");
+  }
+}
+
+//invia una domanda grounded al backend
+async function askProductQuestion(itemId) {
+  const input = document.getElementById("qaQuestionInput");
+  const question = input.value.trim();
+  if (!question) {
+    renderQaError("Scrivi una domanda sul prodotto.");
+    return;
+  }
+
+  setQaLoading(true);
+  try {
+    const response = await postJson(`/products/${encodeURIComponent(itemId)}/qa`, {
+      question,
+      use_ai: true,
+    });
+    renderProductQaResponse(response);
+  } catch (error) {
+    console.error(error);
+    renderQaError("Risposta QA non disponibile.");
+  } finally {
+    setQaLoading(false);
+  }
+}
+
+function setQaLoading(isLoading) {
+  const button = document.getElementById("qaSubmitButton");
+  if (!button) {
+    return;
+  }
+  button.disabled = isLoading;
+  button.textContent = isLoading ? "Caricamento..." : "Chiedi";
+}
+
+//mostra risposta ed evidenze usate dal backend
+function renderProductQaResponse(response) {
+  const answerBox = document.getElementById("qaAnswer");
+  const evidenceBox = document.getElementById("qaEvidence");
+  const confidence = ["low", "medium", "high"].includes(response.confidence)
+    ? response.confidence
+    : "low";
+  answerBox.className = `qa-answer confidence-${confidence}`;
+  answerBox.innerHTML = `
+    <strong>Risposta</strong>
+    <p>${escapeHtml(response.answer || "")}</p>
+  `;
+
+  const evidence = response.evidence || [];
+  evidenceBox.className = "qa-evidence";
+  if (!evidence.length) {
+    evidenceBox.innerHTML = "<p>Nessuna evidenza specifica recuperata.</p>";
+    return;
+  }
+
+  evidenceBox.innerHTML = `
+    <h3>Evidenze usate</h3>
+    <div class="evidence-list">
+      ${evidence.map((item) => `
+        <article class="evidence-item">
+          <div class="evidence-meta">
+            <span>${escapeHtml(item.source)}</span>
+            <span>score ${Number(item.score || 0).toFixed(2)}</span>
+          </div>
+          <p>${escapeHtml(item.text)}</p>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderQaError(message) {
+  const answerBox = document.getElementById("qaAnswer");
+  const evidenceBox = document.getElementById("qaEvidence");
+  answerBox.className = "qa-answer confidence-low";
+  answerBox.innerHTML = `<strong>Avviso</strong><p>${escapeHtml(message)}</p>`;
+  evidenceBox.className = "qa-evidence hidden";
+  evidenceBox.innerHTML = "";
+}
+
 //renderizza una lista di prodotti in una griglia
 function renderProducts(containerId, products) {
   const container = document.getElementById(containerId);
+  if (containerId === "resultsGrid") {
+    container.className = "product-grid";
+  }
   container.innerHTML = "";
 
   //stato vuoto
@@ -359,6 +509,54 @@ function renderProducts(containerId, products) {
   //creiamo una card per ogni prodotto
   products.forEach((product) => {
     container.appendChild(createProductCard(product));
+  });
+}
+
+//renderizza sezioni cluster con card prodotto cliccabili
+function renderClusters(containerId, clusters) {
+  const container = document.getElementById(containerId);
+  container.className = "cluster-results";
+  container.innerHTML = "";
+
+  if (!clusters.length) {
+    renderMessage(containerId, "Nessun prodotto trovato.");
+    return;
+  }
+
+  clusters.forEach((cluster) => {
+    const section = document.createElement("section");
+    section.className = "cluster-section";
+
+    const heading = document.createElement("div");
+    heading.className = "cluster-heading";
+    heading.innerHTML = `
+      <div>
+        <h3>${escapeHtml(cluster.label)}</h3>
+        <p>${escapeHtml(cluster.description || "")}</p>
+      </div>
+      <span class="cluster-size">${cluster.products.length} prodotti</span>
+    `;
+
+    const keywords = document.createElement("div");
+    keywords.className = "cluster-keywords";
+    (cluster.keywords || []).slice(0, 6).forEach((keyword) => {
+      const chip = document.createElement("span");
+      chip.textContent = keyword;
+      keywords.appendChild(chip);
+    });
+
+    const grid = document.createElement("div");
+    grid.className = "product-grid cluster-grid";
+    cluster.products.forEach((product) => {
+      grid.appendChild(createProductCard(product));
+    });
+
+    section.appendChild(heading);
+    if (keywords.children.length) {
+      section.appendChild(keywords);
+    }
+    section.appendChild(grid);
+    container.appendChild(section);
   });
 }
 

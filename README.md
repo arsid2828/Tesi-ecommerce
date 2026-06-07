@@ -1,2 +1,5 @@
 # Tesi-ecommerce
-sistemi di raccomandazione in ambito e-commerce, basata su dataset pubblici di prodotti, recensioni e valutazioni, con possibile estensione a un sistema di Question Answering sui prodotti tramite recensioni e metadati.
+
+Progetto di tesi su recommender system e product discovery in ambito e-commerce, basato su dataset pubblici di prodotti, recensioni, valutazioni e QA.
+
+Il prototipo web si trova in `prototype/` e include catalogo demo, ricerca locale, ricerca assistita da Gemini con fallback, clustering dei risultati e QA grounded nella pagina prodotto. Le istruzioni operative sono in `prototype/README.md`.

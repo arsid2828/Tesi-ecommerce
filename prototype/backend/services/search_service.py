@@ -19,11 +19,21 @@ def search_products(
     normalized_query=(query or "").strip().lower() #se query none diventa vuota, toglie spazi inutili e converte in minuscolo
     #filtriamo sui campi testuali
     if normalized_query:
-        filtered=[
+        exact_matches=[
             product
             for product in filtered
             if _matches_query(product,normalized_query)
         ]
+        #se la query esatta non trova nulla, usiamo pochi sinonimi utili al dataset demo
+        if exact_matches:
+            filtered=exact_matches
+        else:
+            expanded_terms=_expanded_query_terms(normalized_query)
+            filtered=[
+                product
+                for product in filtered
+                if any(_matches_query(product,term) for term in expanded_terms)
+            ]
     #ordinati per popolarità
     ordered=sorted(filtered,key=lambda product: product.popularity_score,reverse=True)
     return ordered[:limit]
@@ -39,3 +49,32 @@ def _matches_query(product: Product,query: str) -> bool:
         ]
     ).lower()
     return query in searchable_text #se presente, ritorna true, sennò false
+
+
+def _expanded_query_terms(query: str) -> list[str]:
+    synonyms={
+        "telefono": ["phone","cell phone","smartphone"],
+        "telefoni": ["phone","cell phone","smartphone"],
+        "cellulare": ["phone","cell phone","smartphone"],
+        "cellulari": ["phone","cell phone","smartphone"],
+        "fotocamera": ["camera","photo"],
+        "foto": ["camera","photo"],
+        "batteria": ["battery","charge"],
+        "gaming": ["gaming","game","video games"],
+        "giochi": ["game","video games"],
+        "economico": ["cheap","budget","low price"],
+        "economici": ["cheap","budget","low price"],
+        "accessori": ["accessories"],
+        "cuffie": ["headphones","earbuds"],
+        "custodia": ["case","cover"],
+    }
+    terms=[query]
+    for token in query.split():
+        terms.extend(synonyms.get(token,[]))
+
+    unique_terms=[]
+    for term in terms:
+        clean=term.strip().lower()
+        if clean and clean not in unique_terms:
+            unique_terms.append(clean)
+    return unique_terms

@@ -6,5 +6,6 @@ pandas
 pydantic
 pyarrow
 requests
+scikit-learn
 tqdm
 uvicorn

@@ -2,9 +2,9 @@
 
 ## Obiettivo
 
-Primo prototipo minimale per una tesi su recommender system e product discovery in e-commerce. Serve a testare la struttura applicativa iniziale: catalogo Amazon-like, ricerca testuale, ordinamento per popolarita, pagina dettaglio e immagini prodotto con fallback.
+Prototipo web minimale per una tesi triennale su recommender system e product discovery in e-commerce. Include catalogo Amazon-like, ricerca testuale locale, ricerca assistita da Gemini con fallback locale, clustering demo dei risultati di ricerca e QA grounded nella pagina dettaglio prodotto.
 
-Non include AI, clustering, database, estensione Chrome o chiamate a servizi esterni.
+Il progetto resta volutamente semplice: dati JSON/parquet locali, backend FastAPI, frontend statico HTML/CSS/JavaScript, nessun database e nessuna chiave API nel frontend.
 
 ## Struttura
 
@@ -12,15 +12,19 @@ Non include AI, clustering, database, estensione Chrome o chiamate a servizi est
 prototype/
   data/
     products_demo.json
+    processed/prototype_amazon_like_intersection/
+      qa.parquet
+      ratings.parquet
   backend/
-    __init__.py
     app.py
     schemas.py
     services/
-      __init__.py
+      ai_search_service.py
       catalog_service.py
-      search_service.py
+      clustering_service.py
+      product_qa_service.py
       recommendation_service.py
+      search_service.py
   frontend/
     index.html
     product.html
@@ -28,18 +32,20 @@ prototype/
     style.css
   scripts/
     export_demo_catalog.py
-  README.md
 ```
 
-## Esportare il catalogo demo
+## Configurazione AI opzionale
 
-Esempio con un file gia presente nei dati processati:
+Gemini e opzionale. Se la chiave manca, il backend usa fallback locali.
+
+Creare un file `.env` nella root del progetto o in `prototype/`:
 
 ```bash
-python prototype/scripts/export_demo_catalog.py --input data/processed/test_dataset2_intersection/items.parquet --output prototype/data/products_demo.json --limit 200
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-2.5-flash
 ```
 
-Lo script accetta input parquet, csv, json e jsonl. Normalizza colonne con nomi diversi, calcola `popularity_score` normalizzando `rating_count` tra 0 e 1, prova a estrarre il primo URL immagine disponibile e crea un catalogo piccolo e bilanciato tra categorie.
+La chiave viene letta solo dal backend.
 
 ## Avviare il backend
 
@@ -55,6 +61,68 @@ Endpoint principali:
 - `GET /categories`
 - `GET /popular?limit=20`
 - `GET /search?q=...&category=...&limit=30`
+- `POST /ai-search`
+- `POST /search/clustered`
+- `POST /products/{item_id}/qa`
+
+## Clustering dei risultati
+
+Nel catalogo e disponibile la checkbox `Raggruppa risultati in cluster`.
+
+Quando e attiva, il frontend chiama:
+
+```http
+POST /search/clustered
+```
+
+Esempio payload:
+
+```json
+{
+  "query": "telefoni",
+  "category": null,
+  "limit": 40,
+  "use_ai_labels": true
+}
+```
+
+Il backend:
+
+- esegue prima la ricerca locale sui prodotti;
+- clusterizza solo quei risultati con TF-IDF e MiniBatchKMeans;
+- sceglie 1, 2, 3 o massimo 5 cluster in base al numero di risultati;
+- usa Gemini solo per label/descrizione dei cluster, se disponibile;
+- mantiene sempre i prodotti originali dei risultati, senza far scegliere item all'AI.
+
+Se Gemini o scikit-learn non sono disponibili, la risposta resta locale e serializzabile.
+
+## QA nella pagina prodotto
+
+In `product.html?id=...` e presente la sezione `Domande sul prodotto`.
+
+Il frontend chiama:
+
+```http
+POST /products/{item_id}/qa
+```
+
+Esempio payload:
+
+```json
+{
+  "question": "La batteria dura tanto?",
+  "use_ai": true
+}
+```
+
+Il backend costruisce documenti testuali solo per quel prodotto:
+
+- metadati e descrizione da `products_demo.json`;
+- QA storiche da `qa.parquet`, se presente;
+- recensioni testuali da `ratings.parquet`, se presente;
+- futuri file opzionali `qa_demo.json`, `product_qa_demo.json`, `reviews_demo.json`, `product_reviews_demo.json`.
+
+La domanda viene confrontata con i chunk tramite TF-IDF. Gemini, se disponibile, riceve solo domanda ed evidenze recuperate. Se le evidenze non bastano, la risposta dichiara esplicitamente che non ci sono abbastanza informazioni.
 
 ## Avviare il frontend
 
@@ -68,18 +136,28 @@ Poi aprire:
 http://localhost:3000
 ```
 
-## Limiti della prima versione
+## Test manuali rapidi
 
-- Ricerca solo testuale con match semplice su titolo, categoria e descrizione.
-- Raccomandazioni solo baseline MostPopular.
-- Dati caricati da JSON locale a ogni avvio del backend.
-- Nessun profilo utente, storico interazioni o personalizzazione.
-- Nessun database e nessuna pipeline di training.
+Backend:
 
-## Idee future
+```bash
+curl http://localhost:8000/health
+curl "http://localhost:8000/search?q=phone&limit=5"
+curl -X POST http://localhost:8000/search/clustered -H "Content-Type: application/json" -d "{\"query\":\"telefoni\",\"limit\":40,\"use_ai_labels\":false}"
+curl -X POST http://localhost:8000/products/B0002GTTRC/qa -H "Content-Type: application/json" -d "{\"question\":\"Come si installa il filtro?\",\"use_ai\":false}"
+```
 
-- Aggiungere filtri per prezzo, rating e disponibilita di immagine.
-- Introdurre metriche offline per confrontare baseline e modelli.
-- Integrare una pagina di confronto tra MostPopular, content-based e modelli collaborativi.
-- Aggiungere logging delle query e valutazione della product discovery.
-- Passare a un backend dati piu strutturato solo quando il prototipo cresce.
+Frontend:
+
+- ricerca normale con checkbox clustering disattivata;
+- ricerca `telefoni` con checkbox clustering attivata;
+- click su una card clusterizzata e apertura dettaglio prodotto;
+- domanda nella sezione QA del prodotto;
+- prova senza `GEMINI_API_KEY` per verificare i fallback locali.
+
+## Limiti rimasti
+
+- La ricerca locale resta semplice e basata su match testuali con pochi sinonimi IT->EN.
+- Il clustering e dimostrativo, non semantico profondo.
+- Il QA e retrieval-based: risponde solo se trova evidenze nei dati locali.
+- Nessun profilo utente, storico interazioni, database o personalizzazione online.
