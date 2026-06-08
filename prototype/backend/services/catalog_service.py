@@ -6,14 +6,18 @@ from pathlib import Path
 from prototype.backend.schemas import CategorySummary,Product #schemi pydantic definiti nel backend
 
 
-#classe che gestisce il catalogo dei prodotti
+#Classe che gestisce il catalogo dei prodotti
+#Carica il JSON una volta e crea anche un indice item_id->Product
+#Il catalogo viene tenuto in memoria per rendere veloci le API demo
 class CatalogService:
     def __init__(self,data_path: Path):
         self.data_path=data_path #salva percorso del file
         self._products=self._load_products() #carica i prodotti dal json
-        self._by_id={product.item_id: product for product in self._products} #dizionario per trovare rapidamente i prodotti con itemid
+        self._by_id={product.item_id: product for product in self._products} #lookup O(1) per dettaglio prodotto
 
-    #carichiamo il JSON e ordiniamo per popolarita
+    #Carichiamo il JSON e ordiniamo per popolarita
+    #Scartiamo prodotti senza prezzo per evitare card poco realistiche
+    #Se il file manca,il backend resta avviabile con lista vuota
     def _load_products(self) -> list[Product]:
         #se il file manca il prototipo parte con catalogo vuoto
         if not self.data_path.exists():
@@ -24,13 +28,15 @@ class CatalogService:
             rows=json.load(file) #lista di dizionari
 
         #prende ogni riga del json, la pulisce e la trasforma in un ogg Product, ** serve a spacchettare come parametri
-        products=[Product(**self._clean_row(row)) for row in rows]
+        products=[Product(**self._clean_row(row)) for row in rows] #** passa le chiavi del dict ai campi Pydantic
         products=[product for product in products if self._has_price(product)]
         return sorted(products,key=lambda item: item.popularity_score,reverse=True) #ordina per popolarità
 
-    #ripuliamo valori NaN letti dal JSON demo
+    #Ripuliamo valori NaN letti dal JSON demo
+    #Pydantic e JSON non gestiscono bene NaN come valore valido
+    #Convertire a None rende le risposte API serializzabili
     def _clean_row(self,row: dict) -> dict:
-        return {key:self._clean_value(value) for key,value in row.items()}
+        return {key:self._clean_value(value) for key,value in row.items()} #applica la pulizia campo per campo
 
     #convertiamo NaN in None per Pydantic e JSON validi
     @staticmethod
@@ -58,9 +64,11 @@ class CatalogService:
     def get_product(self,item_id: str) -> Product | None:
         return self._by_id.get(item_id)
 
-    #calcoliamo le categorie disponibili
+    #Calcoliamo le categorie disponibili
+    #Counter aggrega i prodotti per categoria
+    #La lista finale e ordinata alfabeticamente per rendere stabile la select
     def categories(self) -> list[CategorySummary]:
-        counts=Counter(product.category for product in self._products)
+        counts=Counter(product.category for product in self._products) #conteggio per categoria
         return [
             CategorySummary(category=category,count=count) #ogni categoria trasformata in oggetto pydantic
             for category,count in sorted(counts.items(),key=lambda row: row[0].lower()) #ordina categorie alfabeticamente, ignorando maiuscole
@@ -74,7 +82,9 @@ class CatalogService:
     def all_products(self) -> list[Product]:
         return list(self._products)
 
-    #applichiamo il filtro categoria quando presente
+    #Applichiamo il filtro categoria quando presente
+    #Il confronto e case-insensitive per evitare differenze tra UI e dataset
+    #Senza categoria restituiamo la lista originale gia ordinata
     @staticmethod
     def _filter_by_category(products: list[Product],category: str | None) -> list[Product]:
         #senza categoria manteniamo tutti i prodotti

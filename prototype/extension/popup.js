@@ -1,5 +1,8 @@
 const BACKEND_URL = "http://localhost:8000";
 
+//Stato minimo del popup
+//itemId vale per il prototipo locale,amazonProduct per Amazon reale
+//I due casi sono separati per non chiamare il backend su pagine Amazon
 const popupState = {
   itemId: null,
   amazonProduct: null,
@@ -7,7 +10,9 @@ const popupState = {
 
 document.addEventListener("DOMContentLoaded", initPopup);
 
-//inizializza popup,tab attiva e dati demo
+//Inizializza popup,tab attiva e dati demo
+//Prima capisce dove si trova la tab corrente,poi controlla backend e raccomandazioni
+//Le chiamate indipendenti partono in parallelo per rendere il popup piu rapido
 async function initPopup() {
   const tab = await getActiveTab();
   const currentUrl = tab && tab.url ? tab.url : "";
@@ -19,7 +24,9 @@ async function initPopup() {
   await Promise.all([checkBackendStatus(), loadRecommendations()]);
 }
 
-//legge la tab attiva usando API Chrome
+//Legge la tab attiva usando API Chrome
+//Chrome API usa callback,quindi la incapsuliamo in Promise
+//Questo permette di usare await nel resto del codice
 function getActiveTab() {
   return new Promise((resolve) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -28,7 +35,9 @@ function getActiveTab() {
   });
 }
 
-//controlla se la tab contiene una pagina prodotto locale o Amazon
+//Controlla se la tab contiene una pagina prodotto locale o Amazon
+//Resetta sempre lo stato prima di applicare il nuovo rilevamento
+//Amazon resta in sola lettura:mostriamo dati ma non abilitiamo Carica prodotto
 async function updateProductPageState(tab, currentUrl) {
   const product = await detectActiveProduct(tab, currentUrl);
   const button = document.getElementById("loadProductButton");
@@ -49,7 +58,7 @@ async function updateProductPageState(tab, currentUrl) {
     setText("productPageStatus", "Prodotto Amazon rilevato.");
     setText("itemIdValue", `ASIN: ${product.asin}`);
     button.textContent = "Solo riconoscimento";
-    button.disabled = true;
+    button.disabled = true; //per ora Amazon fa solo riconoscimento,non lookup backend
     renderAmazonProduct(product);
     return;
   }
@@ -61,7 +70,9 @@ async function updateProductPageState(tab, currentUrl) {
   setResultText("Nessun prodotto caricato.");
 }
 
-//usa il detector URL e, quando possibile, integra i dati letti dal content script
+//Usa il detector URL e,quando possibile,integra i dati letti dal content script
+//Il popup puo leggere l'URL,ma solo il content script puo leggere titolo/immagine dal DOM pagina
+//Se content script non risponde,usiamo comunque il rilevamento da URL
 async function detectActiveProduct(tab, currentUrl) {
   const urlProduct = window.ThesisProductDetector.detectFromUrl(currentUrl);
   const pageProduct = await requestDetectedProduct(tab);
@@ -70,7 +81,7 @@ async function detectActiveProduct(tab, currentUrl) {
     return urlProduct;
   }
 
-  if (!urlProduct || urlProduct.kind === pageProduct.kind) {
+  if (!urlProduct || urlProduct.kind === pageProduct.kind) { //fonde URL e DOM solo se parlano dello stesso tipo pagina
     return {
       ...urlProduct,
       ...pageProduct,
@@ -80,7 +91,9 @@ async function detectActiveProduct(tab, currentUrl) {
   return urlProduct;
 }
 
-//richiede al content script i dati gia letti dalla pagina attiva
+//Richiede al content script i dati gia letti dalla pagina attiva
+//Il timeout evita popup bloccato su pagine dove il content script non gira
+//chrome.runtime.lastError e normale se la tab non e tra i match del manifest
 function requestDetectedProduct(tab) {
   return new Promise((resolve) => {
     if (!tab || typeof tab.id === "undefined" || !chrome.tabs || !chrome.tabs.sendMessage) {
@@ -88,7 +101,7 @@ function requestDetectedProduct(tab) {
       return;
     }
 
-    const timeoutId = setTimeout(() => resolve(null), 500);
+    const timeoutId = setTimeout(() => resolve(null), 500); //fallback rapido se non arriva risposta
     chrome.tabs.sendMessage(tab.id, { type: "GET_DETECTED_PRODUCT" }, (response) => {
       clearTimeout(timeoutId);
       if (chrome.runtime.lastError || !response || !response.product) {
@@ -122,7 +135,9 @@ async function checkBackendStatus() {
   }
 }
 
-//carica dettaglio prodotto quando disponibile un item_id
+//Carica dettaglio prodotto quando disponibile un item_id
+//Per Amazon non chiama il backend:mostra solo il prodotto rilevato
+//Per locale usa /products/{item_id}
 async function loadCurrentProduct() {
   const result = document.getElementById("productResult");
   if (popupState.amazonProduct) {
@@ -183,7 +198,9 @@ function renderProduct(product) {
   result.appendChild(layout);
 }
 
-//mostra il prodotto Amazon riconosciuto senza chiamare il backend
+//Mostra il prodotto Amazon riconosciuto senza chiamare il backend
+//Usa lo stesso layout del prodotto locale per rendere la demo coerente
+//I campi arrivano dal detector,quindi possono essere incompleti
 function renderAmazonProduct(product) {
   const result = document.getElementById("productResult");
   result.innerHTML = "";
@@ -192,7 +209,7 @@ function renderAmazonProduct(product) {
   const layout = document.createElement("div");
   layout.className = "popup-product-layout";
 
-  const imageBox = createProductImage({
+  const imageBox = createProductImage({ //adatta campi Amazon al formato atteso da createProductImage
     image_url: product.imageUrl,
     title: product.title || product.asin,
   }, "popup-product-image");
@@ -236,7 +253,9 @@ async function loadRecommendations() {
   }
 }
 
-//usa endpoint semantico,se non esiste usa /popular
+//Usa endpoint semantico,se non esiste usa /popular
+//Il primo path e pensato per future API recommendation
+//Il fallback mantiene compatibile il popup con il backend attuale
 async function fetchRecommendations() {
   try {
     return await fetchBackend("/recommendations/popular?limit=5");
@@ -245,7 +264,9 @@ async function fetchRecommendations() {
   }
 }
 
-//renderizza lista raccomandazioni senza HTML non sicuro
+//Renderizza lista raccomandazioni senza HTML non sicuro
+//Costruisce nodi DOM invece di concatenare HTML dinamico
+//Questo evita interpretazione accidentale dei testi prodotto come markup
 function renderRecommendations(products) {
   const list = document.getElementById("recommendationsList");
   list.innerHTML = "";
@@ -280,7 +301,9 @@ function renderRecommendations(products) {
   });
 }
 
-//crea immagine prodotto con fallback
+//Crea immagine prodotto con fallback
+//Se manca image_url o fallisce il caricamento,mostra placeholder
+//La stessa funzione serve sia prodotti locali sia Amazon riconosciuto
 function createProductImage(product, className) {
   const wrapper = document.createElement("div");
   wrapper.className = className;

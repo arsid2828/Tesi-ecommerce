@@ -1,7 +1,9 @@
 //URL base del backend FastAPI
 const BASE_API_URL = "http://localhost:8000";
 
-//stato minimale condiviso dalla pagina catalogo
+//Stato minimale condiviso dalla pagina catalogo
+//Tiene separati prodotti correnti,ricerca AI e cluster per non perdere i dati originali
+//I filtri frontend lavorano su currentProducts senza richiamare sempre il backend
 const state = {
   categories: [],
   currentProducts: [],
@@ -23,7 +25,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-//inizializza catalogo,categorie e listener della ricerca
+//Inizializza catalogo,categorie e listener della ricerca
+//Carica dati iniziali in parallelo dove possibile
+//Poi collega tutti i controlli della UI alle funzioni di filtro/ricerca
 async function initCatalogPage() {
   await loadCategories();
   await Promise.all([loadInitialProducts(), loadPopularProducts()]);
@@ -80,7 +84,9 @@ async function initProductPage() {
   await Promise.all([loadProductDetail(itemId), loadRecommendations()]);
 }
 
-//wrapper semplice per chiamate GET al backend
+//Wrapper semplice per chiamate GET al backend
+//Centralizza gestione errori HTTP
+//Chi chiama puo usare try/catch senza duplicare controlli response.ok
 async function fetchJson(path) {
   const response = await fetch(`${BASE_API_URL}${path}`);
   //gestiamo errori HTTP come eccezioni
@@ -90,7 +96,9 @@ async function fetchJson(path) {
   return response.json();
 }
 
-//wrapper per chiamate POST JSON al backend
+//Wrapper per chiamate POST JSON al backend
+//Converte il body in JSON e imposta Content-Type
+//Viene usato per AI search,clustering e QA prodotto
 async function postJson(path, body) {
   const response = await fetch(`${BASE_API_URL}${path}`, {
     method: "POST",
@@ -138,25 +146,27 @@ async function loadPopularProducts() {
   }
 }
 
-//esegue ricerca testuale con eventuale filtro categoria
+//Esegue ricerca testuale con eventuale filtro categoria
+//Se il clustering e attivo chiama endpoint cluster,altrimenti ricerca locale o AI
+//Dopo ogni ricerca resetta filtri prezzo per allinearli ai nuovi risultati
 async function runSearch() {
   const query = document.getElementById("searchInput").value.trim();
   const question = document.getElementById("aiQuestionInput").value.trim();
   const category = document.getElementById("categorySelect").value;
   const clusteringEnabled = document.getElementById("clusterSearchCheckbox").checked;
-  const params = new URLSearchParams({ q: query, limit: "500" });
+  const params = new URLSearchParams({ q: query, limit: "500" }); //costruisce query string sicura
   //aggiungiamo categoria solo se selezionata
   if (category) {
     params.set("category", category);
   }
 
   try {
-    state.aiSearch = null;
-    state.clusteredSearch = null;
+    state.aiSearch = null; //cancella avviso AI precedente
+    state.clusteredSearch = null; //cancella cluster precedente
     let products = [];
     if (clusteringEnabled) {
       state.clusteredSearch = await runClusteredSearch(query, category);
-      products = flattenClusterProducts(state.clusteredSearch);
+      products = flattenClusterProducts(state.clusteredSearch); //serve per riusare filtri prezzo/rating
     } else {
       products = question
         ? await runAiSearch(query, question, category)
@@ -164,14 +174,16 @@ async function runSearch() {
     }
     state.currentProducts = products;
     state.priceFilterActive = false;
-    updatePriceControls(products);
+    updatePriceControls(products); //ricalcola min/max slider sui nuovi risultati
     applyCatalogFilters();
   } catch (error) {
     renderMessage("resultsGrid", "Ricerca non disponibile.");
   }
 }
 
-//usa Gemini solo quando l'utente ha scritto una domanda/esigenza
+//Usa Gemini solo quando l'utente ha scritto una domanda/esigenza
+//Il backend prova AI ma puo rispondere fallback locale
+//Se anche la POST fallisce,torniamo alla ricerca GET semplice
 async function runAiSearch(query, question, category) {
   try {
     const response = await postJson("/ai-search", {
@@ -182,7 +194,7 @@ async function runAiSearch(query, question, category) {
     });
     state.aiSearch = {
       answer: response.answer,
-      fallback: Boolean(response.fallback),
+      fallback: Boolean(response.fallback), //normalizza valore per classi CSS/avviso
     };
     return response.results || [];
   } catch (error) {
@@ -191,7 +203,7 @@ async function runAiSearch(query, question, category) {
       answer: "Ricerca AI non disponibile, mostrati risultati locali.",
       fallback: true,
     };
-    const params = new URLSearchParams({ q: query, limit: "500" });
+    const params = new URLSearchParams({ q: query, limit: "500" }); //fallback locale con stessi filtri base
     if (category) {
       params.set("category", category);
     }
@@ -209,13 +221,17 @@ async function runClusteredSearch(query, category) {
   });
 }
 
-//appiattiamo solo per riusare filtri prezzo/rating gia presenti nel frontend
+//Appiattiamo solo per riusare filtri prezzo/rating gia presenti nel frontend
+//I cluster originali restano in state.clusteredSearch
+//Quando renderizziamo,ricostruiamo i cluster filtrando solo prodotti visibili
 function flattenClusterProducts(clusteredSearch) {
   const clusters = clusteredSearch.clusters || [];
   return clusters.flatMap((cluster) => cluster.products || []);
 }
 
-//applica filtri e ordinamento lato frontend
+//Applica filtri e ordinamento lato frontend
+//Lavora sempre su una copia per non alterare state.currentProducts
+//Se c'e ordine AI e sort e popularity_desc,conserviamo l'ordine suggerito
 function applyCatalogFilters() {
   let products = [...state.currentProducts];
   const minRating = Number(document.getElementById("minRatingSelect").value || 0);
@@ -225,7 +241,7 @@ function applyCatalogFilters() {
     const minPrice = Number(document.getElementById("minPriceInput").value || 0);
     const maxPrice = Number(document.getElementById("maxPriceInput").value || 0);
     products = products.filter((product) => {
-      const price = normalizePrice(product.price);
+      const price = normalizePrice(product.price); //normalizza prima di confrontare range
       return price !== null && price >= minPrice && price <= maxPrice;
     });
   }
@@ -239,7 +255,7 @@ function applyCatalogFilters() {
   }
 
   const sortMode = document.getElementById("sortSelect").value;
-  if (!hasAiOrder(products) || sortMode !== "popularity_desc") {
+  if (!hasAiOrder(products) || sortMode !== "popularity_desc") { //non sovrascrive ranking AI di default
     products = sortProducts(products, sortMode);
   }
   renderAiSearchNotice();
@@ -252,9 +268,11 @@ function applyCatalogFilters() {
   setResultsCount(products.length, state.currentProducts.length);
 }
 
-//applica filtri e ordinamento ai prodotti interni a ogni cluster
+//Applica filtri e ordinamento ai prodotti interni a ogni cluster
+//Usa visibleIds per mantenere solo i prodotti sopravvissuti ai filtri
+//Elimina cluster diventati vuoti dopo filtri prezzo/rating
 function filterAndSortClusters(clusters, visibleProducts, sortMode) {
-  const visibleIds = new Set(visibleProducts.map((product) => product.item_id));
+  const visibleIds = new Set(visibleProducts.map((product) => product.item_id)); //lookup veloce per id visibili
   return clusters
     .map((cluster) => {
       const products = (cluster.products || []).filter((product) => visibleIds.has(product.item_id));
@@ -271,7 +289,9 @@ function hasAiOrder(products) {
   return products.some((product) => product.ai_score !== null && product.ai_score !== undefined);
 }
 
-//ordina i prodotti secondo la scelta utente
+//Ordina i prodotti secondo la scelta utente
+//Crea una copia per non mutare l'array ricevuto
+//I prezzi mancanti sono gestiti da priceForSort
 function sortProducts(products, sortMode) {
   const ordered = [...products];
   if (sortMode === "price_asc") {
@@ -304,11 +324,13 @@ function priceForSort(value, desc) {
   return price;
 }
 
-//aggiorna slider prezzo in base ai prodotti caricati
+//Aggiorna slider prezzo in base ai prodotti caricati
+//Usa solo prezzi validi,cosi prodotti senza prezzo non falsano il range
+//Se non ci sono prezzi,disabilita i controlli
 function updatePriceControls(products) {
   const minPriceInput = document.getElementById("minPriceInput");
   const maxPriceInput = document.getElementById("maxPriceInput");
-  const prices = products.map((product) => normalizePrice(product.price)).filter((price) => price !== null);
+  const prices = products.map((product) => normalizePrice(product.price)).filter((price) => price !== null); //scarta null prima di min/max
 
   if (!prices.length) {
     minPriceInput.disabled = true;
@@ -321,7 +343,7 @@ function updatePriceControls(products) {
 
   const minPrice = Math.floor(Math.min(...prices));
   const maxPrice = Math.ceil(Math.max(...prices));
-  [minPriceInput, maxPriceInput].forEach((input) => {
+  [minPriceInput, maxPriceInput].forEach((input) => { //sincronizza attributi comuni dei due slider
     input.disabled = false;
     input.min = String(minPrice);
     input.max = String(maxPrice);
@@ -332,7 +354,9 @@ function updatePriceControls(products) {
   updatePriceLabel(minPrice, maxPrice);
 }
 
-//sincronizza i due slider del prezzo
+//Sincronizza i due slider del prezzo
+//Impedisce che il minimo superi il massimo o viceversa
+//Attiva il filtro prezzo solo dopo interazione utente
 function syncPriceRange(changedInput) {
   const minPriceInput = document.getElementById("minPriceInput");
   const maxPriceInput = document.getElementById("maxPriceInput");
@@ -414,7 +438,9 @@ function disableProductQa() {
   }
 }
 
-//invia una domanda grounded al backend
+//Invia una domanda grounded al backend
+//Il backend recupera evidenze solo per il prodotto corrente
+//finally spegne sempre lo stato loading,anche in caso di errore
 async function askProductQuestion(itemId) {
   const input = document.getElementById("qaQuestionInput");
   const question = input.value.trim();
@@ -447,11 +473,13 @@ function setQaLoading(isLoading) {
   button.textContent = isLoading ? "Caricamento..." : "Chiedi";
 }
 
-//mostra risposta ed evidenze usate dal backend
+//Mostra risposta ed evidenze usate dal backend
+//La confidence controlla il colore del box risposta
+//Tutti i testi dinamici passano da escapeHtml prima di entrare nell'HTML
 function renderProductQaResponse(response) {
   const answerBox = document.getElementById("qaAnswer");
   const evidenceBox = document.getElementById("qaEvidence");
-  const confidence = ["low", "medium", "high"].includes(response.confidence)
+  const confidence = ["low", "medium", "high"].includes(response.confidence) //valida classe CSS attesa
     ? response.confidence
     : "low";
   answerBox.className = `qa-answer confidence-${confidence}`;
@@ -470,7 +498,7 @@ function renderProductQaResponse(response) {
   evidenceBox.innerHTML = `
     <h3>Evidenze usate</h3>
     <div class="evidence-list">
-      ${evidence.map((item) => `
+      ${evidence.map((item) => ` //template sicuro perche i campi testuali sono escapati
         <article class="evidence-item">
           <div class="evidence-meta">
             <span>${escapeHtml(item.source)}</span>
@@ -512,7 +540,9 @@ function renderProducts(containerId, products) {
   });
 }
 
-//renderizza sezioni cluster con card prodotto cliccabili
+//Renderizza sezioni cluster con card prodotto cliccabili
+//Ogni cluster ha heading,keyword e una griglia di card
+//Le label possono arrivare da AI,quindi vengono sempre escapate
 function renderClusters(containerId, clusters) {
   const container = document.getElementById(containerId);
   container.className = "cluster-results";
@@ -539,7 +569,7 @@ function renderClusters(containerId, clusters) {
 
     const keywords = document.createElement("div");
     keywords.className = "cluster-keywords";
-    (cluster.keywords || []).slice(0, 6).forEach((keyword) => {
+    (cluster.keywords || []).slice(0, 6).forEach((keyword) => { //limita chip per non appesantire UI
       const chip = document.createElement("span");
       chip.textContent = keyword;
       keywords.appendChild(chip);
@@ -582,7 +612,9 @@ function renderAiSearchNotice() {
   `;
 }
 
-//crea una card prodotto riutilizzabile
+//Crea una card prodotto riutilizzabile
+//Usa DOM API per struttura principale e escapeHtml per testo dinamico
+//Il click naviga alla pagina dettaglio passando item_id in query string
 function createProductCard(product) {
   const card = document.createElement("article");
   card.className = "product-card";
@@ -720,7 +752,9 @@ function priceClassName(value) {
   return normalizePrice(value) === null ? "price-row muted-price" : "price-row";
 }
 
-//escapa testo prima di inserirlo in HTML
+//Escapa testo prima di inserirlo in HTML
+//Serve per evitare che titoli/descrizioni del dataset vengano interpretati come markup
+//Va usato ogni volta che una stringa dinamica entra in innerHTML
 function escapeHtml(value) {
   return String(value || "")
     .replaceAll("&", "&amp;")

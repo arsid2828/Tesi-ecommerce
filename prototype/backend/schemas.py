@@ -1,8 +1,10 @@
 from pydantic import BaseModel,Field
 
 
-#schema prodotto usato da API e catalogo JSON
-class Product(BaseModel): #singolo prodotto
+#Schema prodotto usato da API e catalogo JSON
+#I default gestiscono valori mancanti nel dataset senza rompere le risposte
+#Questa classe e il contratto comune tra backend,frontend e servizi
+class Product(BaseModel):
     item_id: str
     title: str
     category: str
@@ -49,15 +51,19 @@ class AISearchResponse(BaseModel):
     fallback: bool=False
 
 
-#richiesta per ricerca con clustering sui risultati gia filtrati
+#Richiesta per ricerca con clustering sui risultati gia filtrati
+#Field impone limiti direttamente nello schema,prima che arrivi alla logica
+#Questo evita richieste troppo grandi o non valide
 class ClusteredSearchRequest(BaseModel):
     query: str=""
     category: str | None=None
-    limit: int=Field(default=40,ge=1,le=600)
+    limit: int=Field(default=40,ge=1,le=600) #vincola il numero di risultati accettato
     use_ai_labels: bool=True
 
 
-#singolo cluster di prodotti
+#Singolo cluster di prodotti
+#products contiene gli oggetti originali,non solo gli id
+#keywords e reason servono per rendere spiegabile il raggruppamento
 class ProductCluster(BaseModel):
     cluster_id: str
     label: str
@@ -91,7 +97,9 @@ class ProductQAEvidence(BaseModel):
     score: float
 
 
-#risposta QA del prodotto
+#Risposta QA del prodotto
+#evidence mantiene traccia dei testi usati,cosi la risposta resta verificabile
+#used_ai separa risposta generata da fallback locale
 class ProductQAResponse(BaseModel):
     item_id: str
     question: str

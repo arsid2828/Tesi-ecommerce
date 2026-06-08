@@ -1,14 +1,16 @@
 from prototype.backend.schemas import Product
 
 
-#cerchiamo nei prodotti e ordiniamo con baseline popularity
+#Cerchiamo nei prodotti e ordiniamo con baseline popularity
+#La ricerca resta semplice: filtro categoria,match testuale e fallback con sinonimi
+#Il risultato viene sempre riordinato per popolarita per mantenere una baseline chiara
 def search_products(
     products: list[Product],
     query: str | None, #testo scritto dall'utente
     category: str | None=None, #categoria opzionale
     limit: int=30,
 ) -> list[Product]:
-    filtered=products #copia che filtriamo
+    filtered=products #lista corrente su cui applichiamo filtri progressivi
     #applichiamo prima il filtro categoria
     if category:
         normalized_category=category.lower()
@@ -16,7 +18,7 @@ def search_products(
             product for product in filtered if product.category.lower() == normalized_category
         ]
 
-    normalized_query=(query or "").strip().lower() #se query none diventa vuota, toglie spazi inutili e converte in minuscolo
+    normalized_query=(query or "").strip().lower() #gestisce None e normalizza confronto testuale
     #filtriamo sui campi testuali
     if normalized_query:
         exact_matches=[
@@ -28,7 +30,7 @@ def search_products(
         if exact_matches:
             filtered=exact_matches
         else:
-            expanded_terms=_expanded_query_terms(normalized_query)
+            expanded_terms=_expanded_query_terms(normalized_query) #aggiunge sinonimi IT->EN utili al dataset
             filtered=[
                 product
                 for product in filtered
@@ -39,7 +41,9 @@ def search_products(
     return ordered[:limit]
 
 
-#verifichiamo se la query compare nei campi cercabili
+#Verifichiamo se la query compare nei campi cercabili
+#Unifichiamo titolo,categoria e descrizione in un solo testo normalizzato
+#Questo e semplice ma spiegabile per una demo didattica
 def _matches_query(product: Product,query: str) -> bool:
     searchable_text=" ".join( #unisce, titolo categoria e descrizione
         [
@@ -51,6 +55,9 @@ def _matches_query(product: Product,query: str) -> bool:
     return query in searchable_text #se presente, ritorna true, sennò false
 
 
+#Espandiamo la query con pochi sinonimi manuali
+#Serve per collegare ricerche in italiano a titoli/descrizioni spesso in inglese
+#La lista unique_terms evita duplicati mantenendo l'ordine originale
 def _expanded_query_terms(query: str) -> list[str]:
     synonyms={
         "telefono": ["phone","cell phone","smartphone"],
@@ -70,11 +77,11 @@ def _expanded_query_terms(query: str) -> list[str]:
     }
     terms=[query]
     for token in query.split():
-        terms.extend(synonyms.get(token,[]))
+        terms.extend(synonyms.get(token,[])) #se il token non ha sinonimi non aggiunge nulla
 
     unique_terms=[]
     for term in terms:
         clean=term.strip().lower()
-        if clean and clean not in unique_terms:
+        if clean and clean not in unique_terms: #deduplica preservando ordine
             unique_terms.append(clean)
     return unique_terms

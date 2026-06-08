@@ -11,14 +11,17 @@ from prototype.backend.services.product_qa_service import ProductQAService
 from prototype.backend.services.search_service import search_products
 
 
-#percorso del catalogo demo usato dal backend
-DATA_PATH=Path(__file__).resolve().parents[1] / "data" / "products_demo.json"
-DATA_DIR=DATA_PATH.parent
+#Configuriamo i percorsi dei dati usati dal backend
+#Il catalogo viene letto da JSON,mentre QA/review opzionali stanno nella stessa cartella
+#Assumiamo che app.py resti dentro prototype/backend
+DATA_PATH=Path(__file__).resolve().parents[1] / "data" / "products_demo.json" #risale a prototype e punta al catalogo
+DATA_DIR=DATA_PATH.parent #cartella base per sorgenti QA/review
 
-#creiamo l'app FastAPI del prototipo
+#Creiamo l'app FastAPI del prototipo
+#Qui definiamo anche CORS per permettere al frontend statico di chiamare il backend
+#La configurazione e aperta per una demo locale,non per produzione
 app=FastAPI(title="E-commerce Product Discovery Prototype")
 
-#abilitiamo CORS per il frontend locale
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,9 +30,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-#carichiamo il catalogo una volta all'avvio
-catalog=CatalogService(DATA_PATH)
-product_qa_service=ProductQAService(DATA_DIR)
+#Carichiamo servizi condivisi una sola volta all'avvio
+#Gli endpoint riusano queste istanze invece di rileggere i file a ogni richiesta
+#Questo rende la demo piu veloce ma richiede riavvio se cambiano i dati
+catalog=CatalogService(DATA_PATH) #indicizza prodotti per item_id
+product_qa_service=ProductQAService(DATA_DIR) #precarica sorgenti QA/review opzionali
 
 
 #endpoint di controllo dello stato del backend
@@ -48,7 +53,9 @@ def products(
     return catalog.list_products(limit=limit,offset=offset,category=category)
 
 
-#endpoint dettaglio prodotto tramite item_id
+#Endpoint dettaglio prodotto tramite item_id
+#Se l'id non esiste usiamo HTTP 404,cosi il frontend distingue errore da prodotto vuoto
+#La risposta e validata dallo schema Product
 @app.get("/products/{item_id}",response_model=Product)
 def product_detail(item_id: str) -> Product:
     product=catalog.get_product(item_id)
@@ -58,13 +65,15 @@ def product_detail(item_id: str) -> Product:
     return product
 
 
-#endpoint QA grounded sui dati disponibili del prodotto
+#Endpoint QA grounded sui dati disponibili del prodotto
+#Prima validiamo prodotto e domanda,poi deleghiamo il retrieval al servizio dedicato
+#Il parametro use_ai permette fallback locale quando Gemini non e disponibile
 @app.post("/products/{item_id}/qa",response_model=ProductQAResponse)
 def product_qa(item_id: str,request: ProductQARequest) -> ProductQAResponse:
     product=catalog.get_product(item_id)
     if product is None:
         raise HTTPException(status_code=404,detail="Product not found")
-    if not request.question.strip():
+    if not request.question.strip(): #evita richieste vuote che renderebbero inutile il retrieval
         raise HTTPException(status_code=400,detail="Question is required")
     return product_qa_service.answer_question(
         product=product,
@@ -85,7 +94,9 @@ def popular(limit: int=Query(default=20,ge=1,le=200)) -> list[Product]:
     return catalog.popular(limit=limit)
 
 
-#endpoint ricerca testuale base
+#Endpoint ricerca testuale base
+#Usa il catalogo gia caricato e applica filtri semplici lato backend
+#L'ordinamento finale resta popularity-based per essere spiegabile
 @app.get("/search",response_model=list[Product])
 def search(
     q: str="",
@@ -100,7 +111,9 @@ def search(
     )
 
 
-#endpoint ricerca con clustering locale e label AI opzionali
+#Endpoint ricerca con clustering locale e label AI opzionali
+#Prima recuperiamo risultati testuali,poi clusterizziamo solo quel sottoinsieme
+#L'AI puo rinominare i cluster ma non sceglie prodotti o membership
 @app.post("/search/clustered",response_model=ClusteredSearchResponse)
 def clustered_search(request: ClusteredSearchRequest) -> ClusteredSearchResponse:
     results=search_products(
@@ -116,7 +129,9 @@ def clustered_search(request: ClusteredSearchRequest) -> ClusteredSearchResponse
     )
 
 
-#endpoint ricerca assistita da Gemini con fallback locale
+#Endpoint ricerca assistita da Gemini con fallback locale
+#Gemini lavora su candidati locali gia filtrati,non sul catalogo intero
+#Se la chiamata AI fallisce,la risposta resta utile con risultati locali
 @app.post("/ai-search",response_model=AISearchResponse)
 def ai_search(request: AISearchRequest) -> AISearchResponse:
     return ai_search_products(

@@ -7,6 +7,9 @@ from typing import Any
 from prototype.backend.schemas import ClusteredSearchResponse,Product,ProductCluster
 from prototype.backend.services.ai_search_service import call_gemini
 
+#Import opzionale per clustering locale
+#Se scikit-learn manca,il servizio deve comunque rispondere con un cluster unico
+#Questo mantiene il prototipo robusto anche in ambienti incompleti
 try:
     from sklearn.cluster import MiniBatchKMeans
     from sklearn.feature_extraction.text import TfidfVectorizer
@@ -21,13 +24,15 @@ MAX_KEYWORDS=6
 MAX_TITLES_FOR_AI=5
 
 
-#funzione principale usata dall'endpoint: lavora solo sui risultati ricevuti
+#Funzione principale usata dall'endpoint: lavora solo sui risultati ricevuti
+#Non cerca nel catalogo completo:clusterizza il sottoinsieme gia filtrato
+#Se mancano librerie o dati sufficienti,usa un cluster unico spiegabile
 def cluster_search_results(
     products: list[Product],
     query: str,
     use_ai_labels: bool=True,
 ) -> ClusteredSearchResponse:
-    safe_products=list(products)
+    safe_products=list(products) #copia difensiva per non mutare la lista ricevuta
     if not safe_products:
         return ClusteredSearchResponse(
             query=query,
@@ -36,7 +41,7 @@ def cluster_search_results(
             clusters=[],
         )
 
-    cluster_count=_choose_cluster_count(len(safe_products))
+    cluster_count=_choose_cluster_count(len(safe_products)) #adatta i gruppi alla dimensione risultati
     if cluster_count <= 1 or TfidfVectorizer is None or MiniBatchKMeans is None:
         clusters=[_build_single_cluster(safe_products)]
         return _label_response(
@@ -45,7 +50,7 @@ def cluster_search_results(
             clusters=clusters,
             clustered=False,
             use_ai_labels=use_ai_labels,
-            local_fallback=TfidfVectorizer is None or MiniBatchKMeans is None,
+            local_fallback=TfidfVectorizer is None or MiniBatchKMeans is None, #se sklearn manca lo segnaliamo nella risposta
         )
 
     try:
@@ -77,7 +82,9 @@ def cluster_search_results(
     )
 
 
-#numero di gruppi semplice e spiegabile per il prototipo
+#Numero di gruppi semplice e spiegabile per il prototipo
+#Evita cluster troppo piccoli quando i risultati sono pochi
+#Il massimo resta basso per non complicare la UI
 def _choose_cluster_count(total_results: int) -> int:
     if total_results < 6:
         return 1
@@ -88,38 +95,40 @@ def _choose_cluster_count(total_results: int) -> int:
     return 5 if total_results > 80 else 4
 
 
-#clustering locale con TF-IDF sui testi dei prodotti gia filtrati
+#Clustering locale con TF-IDF sui testi dei prodotti gia filtrati
+#TF-IDF trasforma testo in vettori pesati,poi KMeans crea gruppi simili
+#I cluster vengono riordinati per dimensione per avere output stabile
 def _build_kmeans_clusters(products: list[Product],cluster_count: int) -> list[ProductCluster]:
-    texts=[_product_text(product) for product in products]
+    texts=[_product_text(product) for product in products] #testo compatto usato come base vettoriale
     vectorizer=TfidfVectorizer(
         stop_words="english",
-        ngram_range=(1,2),
+        ngram_range=(1,2), #usa singole parole e coppie di parole
         max_features=900,
         min_df=1,
     )
-    matrix=vectorizer.fit_transform(texts)
+    matrix=vectorizer.fit_transform(texts) #matrice prodotti x termini
     if matrix.shape[1] == 0:
         return [_build_single_cluster(products)]
 
-    safe_cluster_count=min(cluster_count,len(products))
+    safe_cluster_count=min(cluster_count,len(products)) #KMeans non puo avere piu cluster che prodotti
     model=MiniBatchKMeans(
         n_clusters=safe_cluster_count,
         random_state=RANDOM_STATE,
         n_init=10,
         batch_size=max(20,len(products)),
     )
-    labels=model.fit_predict(matrix)
+    labels=model.fit_predict(matrix) #assegna ogni prodotto a un cluster
 
     grouped=defaultdict(list)
     for index,label in enumerate(labels):
-        grouped[int(label)].append(index)
+        grouped[int(label)].append(index) #salva indici prodotti per label cluster
 
     raw_clusters=[]
     for indexes in grouped.values():
         if not indexes:
             continue
         cluster_products=[products[index] for index in indexes]
-        keywords=_keywords_for_indexes(matrix,vectorizer,indexes)
+        keywords=_keywords_for_indexes(matrix,vectorizer,indexes) #parole piu rappresentative del gruppo
         raw_clusters.append((cluster_products,keywords))
 
     #cluster piu grandi prima, con id ricalcolati e stabili per la risposta
@@ -130,6 +139,9 @@ def _build_kmeans_clusters(products: list[Product],cluster_count: int) -> list[P
     return clusters
 
 
+#Costruiamo fallback a cluster unico
+#Serve quando i risultati sono pochi o il clustering non e disponibile
+#Mantiene comunque keyword e reason per spiegare cosa e successo
 def _build_single_cluster(products: list[Product]) -> ProductCluster:
     keywords=_fallback_keywords([_product_text(product) for product in products])
     return ProductCluster(
@@ -156,6 +168,9 @@ def _build_cluster(index: int,products: list[Product],keywords: list[str]) -> Pr
     )
 
 
+#Costruiamo la risposta finale con eventuali label AI
+#Gemini puo solo rinominare cluster gia creati localmente
+#Se fallisce,restano label locali senza bloccare la ricerca
 def _label_response(
     query: str,
     products: list[Product],
@@ -167,7 +182,7 @@ def _label_response(
     used_ai=False
     if use_ai_labels and clusters:
         try:
-            clusters=_apply_ai_labels(query,clusters)
+            clusters=_apply_ai_labels(query,clusters) #sostituisce solo label/descrizione
             used_ai=True
         except Exception as exc:
             logger.warning("Fallback label cluster: %s",exc)
@@ -183,6 +198,8 @@ def _label_response(
 
 
 #Gemini puo solo rinominare/spiegare cluster gia creati localmente
+#Il prompt include keyword e pochi titoli rappresentativi,non tutto il catalogo
+#La validazione scarta cluster_id inventati o JSON non conforme
 def _apply_ai_labels(query: str,clusters: list[ProductCluster]) -> list[ProductCluster]:
     payload={
         "query": query,
@@ -210,13 +227,13 @@ def _apply_ai_labels(query: str,clusters: list[ProductCluster]) -> list[ProductC
         f"Dati:\n{json.dumps(payload,ensure_ascii=False)}"
     )
     raw_response=call_gemini(prompt)
-    data=_parse_json_object(raw_response)
+    data=_parse_json_object(raw_response) #estrae JSON anche se il modello aggiunge testo
     raw_clusters=data.get("clusters")
     if not isinstance(raw_clusters,list):
         raise ValueError("Campo clusters mancante.")
 
     labels_by_id={}
-    valid_ids={cluster.cluster_id for cluster in clusters}
+    valid_ids={cluster.cluster_id for cluster in clusters} #blocca id inventati dall'AI
     for item in raw_clusters:
         if not isinstance(item,dict):
             continue
@@ -270,10 +287,13 @@ def _product_text(product: Product) -> str:
     return " ".join(str(part) for part in parts if part).strip()
 
 
+#Estraiamo keyword rappresentative per un cluster
+#Calcoliamo il centro medio dei prodotti del gruppo nella matrice TF-IDF
+#I termini con peso piu alto diventano keyword locali
 def _keywords_for_indexes(matrix,vectorizer,indexes: list[int]) -> list[str]:
     feature_names=vectorizer.get_feature_names_out()
-    centroid=matrix[indexes].mean(axis=0).A1
-    top_indexes=centroid.argsort()[::-1]
+    centroid=matrix[indexes].mean(axis=0).A1 #vettore medio del cluster
+    top_indexes=centroid.argsort()[::-1] #indici dei termini dal piu pesante
     keywords=[]
     for feature_index in top_indexes:
         if centroid[feature_index] <= 0:
@@ -287,6 +307,9 @@ def _keywords_for_indexes(matrix,vectorizer,indexes: list[int]) -> list[str]:
     return keywords
 
 
+#Fallback keyword senza TF-IDF
+#Conta parole frequenti dopo stopword minime
+#Usato per cluster unico o ambienti senza scikit-learn
 def _fallback_keywords(texts: list[str]) -> list[str]:
     joined=" ".join(texts).lower()
     tokens=[
@@ -316,6 +339,9 @@ def _cluster_sort_key(products: list[Product]) -> str:
     return (products[0].category or products[0].title or "").lower()
 
 
+#Parsa una risposta JSON anche se contiene testo extra
+#Serve per robustezza verso risposte AI non perfettamente pulite
+#Se non trova un oggetto valido,lascia propagare errore e attiva fallback
 def _parse_json_object(raw_response: str) -> dict[str, Any]:
     try:
         data=json.loads(raw_response)
@@ -324,7 +350,7 @@ def _parse_json_object(raw_response: str) -> dict[str, Any]:
         end=raw_response.rfind("}")
         if start < 0 or end < start:
             raise
-        data=json.loads(raw_response[start:end + 1])
+        data=json.loads(raw_response[start:end + 1]) #ritaglia dal primo { all'ultimo }
     if not isinstance(data,dict):
         raise ValueError("La risposta AI non e un oggetto JSON.")
     return data

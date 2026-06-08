@@ -5,22 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tesi E-commerce Demo</title>
   <link rel="stylesheet" href="style.css">
+  <!--detector condiviso caricato prima del popup-->
   <script src="product_detector.js" defer></script>
+  <!--logica del popup estensione-->
   <script src="popup.js" defer></script>
 </head>
 <body class="extension-popup">
   <main class="popup-shell">
+    <!--intestazione compatta del popup-->
     <header class="popup-header">
       <p class="popup-kicker">Prototipo tesi</p>
       <h1>Tesi E-commerce Demo</h1>
     </header>
 
+    <!--stato backend e URL della tab attiva-->
     <section class="popup-section">
       <div id="backendStatus" class="status-pill status-muted">Controllo backend...</div>
       <p class="label">Tab corrente</p>
       <p id="currentUrl" class="url-value">URL non disponibile</p>
     </section>
 
+    <!--riconoscimento prodotto locale o Amazon-->
     <section class="popup-section">
       <p class="label">Pagina prodotto</p>
       <p id="productPageStatus" class="muted-text">Verifica URL in corso...</p>
@@ -29,6 +34,7 @@
       <div id="productResult" class="result-box muted-text">Nessun prodotto caricato.</div>
     </section>
 
+    <!--raccomandazioni dal backend locale-->
     <section class="popup-section">
       <div class="section-heading">
         <h2>Raccomandazioni popolari</h2>

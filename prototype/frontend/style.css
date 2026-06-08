@@ -394,11 +394,13 @@ button {
 }
 
 /*risultati raggruppati in cluster*/
+/*manteniamo i cluster come sezioni separate per non confonderli con la griglia semplice*/
 .cluster-results {
   display: grid;
   gap: 24px;
 }
 
+/*ogni cluster incornicia prodotti simili calcolati dal backend*/
 .cluster-section {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -674,6 +676,7 @@ button {
 }
 
 /*box QA nella pagina dettaglio prodotto*/
+/*la sezione QA resta separata dal dettaglio per evidenziare risposta grounded*/
 .qa-section {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -695,6 +698,7 @@ button {
   border-radius: 8px;
 }
 
+/*colore verde quando la risposta ha confidenza media/alta*/
 .qa-answer {
   padding: 14px 16px;
   border: 1px solid #b9ddd8;
@@ -702,6 +706,7 @@ button {
   color: #24433f;
 }
 
+/*colore giallo quando il backend dichiara confidenza bassa*/
 .qa-answer.confidence-low {
   color: #5c4520;
   background: var(--highlight-soft);

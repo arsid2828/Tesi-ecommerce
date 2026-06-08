@@ -4,7 +4,9 @@ const EXTENSION_BOX_ID = "thesisExtensionDemoBox";
 initContentBox();
 initMessageListener();
 
-//inserisce box demo su pagina prodotto locale o Amazon riconosciuta
+//Inserisce box demo su pagina prodotto locale o Amazon riconosciuta
+//Evita duplicati controllando l'id del box prima di crearne uno nuovo
+//Su Amazon non chiama il backend,per ora segnala solo riconoscimento
 async function initContentBox() {
   if (document.getElementById(EXTENSION_BOX_ID)) {
     return;
@@ -19,25 +21,29 @@ async function initContentBox() {
   insertContentBox(box, product);
 
   const status = box.querySelector(".thesis-extension-status");
-  status.textContent = product.kind === "amazon" ? "Prodotto Amazon riconosciuto" : await getBackendStatusText();
+  status.textContent = product.kind === "amazon" ? "Prodotto Amazon riconosciuto" : await getBackendStatusText(); //backend serve solo per pagine locali
 }
 
-//legge il prodotto dalla pagina usando detector condiviso
+//Legge il prodotto dalla pagina usando detector condiviso
+//Il content script puo accedere al DOM della pagina attiva
+//Per questo integra titolo e immagine che il popup da solo non vede
 function detectCurrentProduct() {
   return window.ThesisProductDetector.detectCurrentPage(window.location.href, document);
 }
 
-//crea box informativo senza usare HTML dinamico non sicuro
+//Crea box informativo senza usare HTML dinamico non sicuro
+//Usa solo createElement/textContent per evitare HTML non controllato
+//Il contenuto cambia tra prodotto locale e prodotto Amazon
 function createContentBox(product) {
   const box = document.createElement("aside");
   box.id = EXTENSION_BOX_ID;
-  box.className = product.kind === "amazon" ? "thesis-extension-box amazon-detected" : "thesis-extension-box";
+  box.className = product.kind === "amazon" ? "thesis-extension-box amazon-detected" : "thesis-extension-box"; //classe extra per adattare layout Amazon
 
   const title = document.createElement("strong");
   title.textContent = "Tesi E-commerce Demo";
 
   const item = document.createElement("span");
-  item.textContent = product.kind === "amazon" ? `ASIN rilevato: ${product.asin}` : `item_id rilevato: ${product.itemId}`;
+  item.textContent = product.kind === "amazon" ? `ASIN rilevato: ${product.asin}` : `item_id rilevato: ${product.itemId}`; //id diverso nei due ambienti
 
   const productTitle = document.createElement("span");
   productTitle.className = "thesis-extension-product-title";
@@ -61,10 +67,12 @@ function createContentBox(product) {
   return box;
 }
 
-//sceglie un punto poco invasivo per inserire il box
+//Sceglie un punto poco invasivo per inserire il box
+//Su Amazon prova ad inserirlo vicino al titolo prodotto
+//Se i selector non esistono,usa body/page-shell come fallback
 function insertContentBox(box, product) {
   if (product.kind === "amazon") {
-    const amazonTarget = document.querySelector("#titleSection") || document.querySelector("#centerCol");
+    const amazonTarget = document.querySelector("#titleSection") || document.querySelector("#centerCol"); //selector comuni nelle pagine prodotto Amazon
     if (amazonTarget && amazonTarget.parentElement) {
       amazonTarget.insertAdjacentElement("afterend", box);
       return;
@@ -75,7 +83,9 @@ function insertContentBox(box, product) {
   target.prepend(box);
 }
 
-//risponde al popup con il prodotto rilevato nella pagina
+//Risponde al popup con il prodotto rilevato nella pagina
+//Il popup manda GET_DETECTED_PRODUCT per ottenere dati DOM
+//Ritorniamo false perche la risposta e sincrona
 function initMessageListener() {
   if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.onMessage) {
     return;
@@ -89,11 +99,13 @@ function initMessageListener() {
     sendResponse({
       product: detectCurrentProduct(),
     });
-    return false;
+    return false; //nessuna risposta asincrona da mantenere aperta
   });
 }
 
-//verifica collegamento con il backend locale
+//Verifica collegamento con il backend locale
+//Usata solo sul prototipo localhost
+//Su Amazon il box non ha bisogno del backend
 async function getBackendStatusText() {
   try {
     const response = await fetch(`${EXTENSION_BACKEND_URL}/health`);

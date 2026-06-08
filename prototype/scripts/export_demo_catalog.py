@@ -12,7 +12,9 @@ import pandas as pd
 #radice del progetto usata per risolvere percorsi relativi
 PROJECT_ROOT=Path(__file__).resolve().parents[2]
 
-#alias supportati per normalizzare colonne diverse
+#Alias supportati per normalizzare colonne diverse
+#Dataset diversi usano nomi diversi per lo stesso concetto
+#Questa mappa permette allo script di accettare parquet/csv prodotti in fasi diverse
 COLUMN_ALIASES={
     "item_id": ["item_id","parent_asin","asin"],
     "title": ["title","product_title","name"],
@@ -32,8 +34,10 @@ COLUMN_ALIASES={
     "image_url": ["image_url","image","main_image","images","large","hi_res"],
 }
 
-#pattern per trovare URL immagine nei campi testuali
-URL_RE=re.compile(r"https?://[^\s'\"<>]+")
+#Pattern per trovare URL immagine nei campi testuali
+#Serve quando il campo immagini e salvato come stringa lunga invece che lista/dict
+#Il pattern si ferma prima di spazi,quote o tag HTML
+URL_RE=re.compile(r"https?://[^\s'\"<>]+") #cattura URL http/https senza includere separatori
 
 
 #leggiamo i parametri da riga di comando
@@ -73,15 +77,17 @@ def find_column(df: pd.DataFrame,aliases: list[str]) -> str | None:
     return None
 
 
-#convertiamo valori testuali,liste e dizionari in testo leggibile
+#Convertiamo valori testuali,liste e dizionari in testo leggibile
+#Molti campi Amazon sono JSON serializzati o liste di feature
+#Qui li rendiamo testo compatto per descrizione e ricerca
 def clean_text(value: Any,default: str="") -> str:
     #valori mancanti diventano fallback
     if is_missing(value):
         return default
-    parsed=parse_nested(value)
+    parsed=parse_nested(value) #prova a convertire stringhe JSON/literal in oggetti Python
     #liste trasformate in frase unica
     if isinstance(parsed,list):
-        return " ".join(clean_text(item) for item in parsed if not is_missing(item)).strip()
+        return " ".join(clean_text(item) for item in parsed if not is_missing(item)).strip() #appiattisce liste annidate
     #dizionari trasformati in coppie chiave-valore
     if isinstance(parsed,dict):
         parts=[]
@@ -121,7 +127,9 @@ def clean_number(value: Any,default: float=0.0) -> float:
     return number
 
 
-#proviamo a interpretare stringhe JSON o literal Python
+#Proviamo a interpretare stringhe JSON o literal Python
+#I dataset possono salvare liste/dict come testo,con sintassi JSON o Python
+#Se il parsing fallisce lasciamo il valore originale per non perdere dati
 def parse_nested(value: Any) -> Any:
     #i valori non stringa restano invariati
     if not isinstance(value,str):
@@ -131,10 +139,10 @@ def parse_nested(value: Any) -> Any:
     if not text:
         return text
     #evitiamo parsing su testo normale
-    if text[0] not in "[{\"'":
+    if text[0] not in "[{\"'": #testo normale:evita parsing inutile e falsi errori
         return value
     #tentiamo parser JSON e literal Python
-    for parser in (json.loads,ast.literal_eval):
+    for parser in (json.loads,ast.literal_eval): #prima JSON,poi literal Python
         try:
             return parser(text)
         except (ValueError,SyntaxError,TypeError,json.JSONDecodeError):
@@ -154,7 +162,9 @@ def is_missing(value: Any) -> bool:
         return False
 
 
-#estraiamo il primo URL immagine valido
+#Estraiamo il primo URL immagine valido
+#Il campo immagini puo essere stringa,dizionario o lista annidata
+#La funzione e ricorsiva per gestire strutture irregolari del dataset
 def extract_image_url(value: Any) -> str | None:
     #senza valore non abbiamo immagine
     if is_missing(value):
@@ -162,12 +172,12 @@ def extract_image_url(value: Any) -> str | None:
     parsed=parse_nested(value)
     #stringa con URL diretto
     if isinstance(parsed,str):
-        match=URL_RE.search(parsed)
+        match=URL_RE.search(parsed) #trova il primo URL dentro testo grezzo
         return match.group(0) if match else None
     #dizionario con possibili chiavi immagine
     if isinstance(parsed,dict):
         for key in ("large","hi_res","image_url","main_image","url"):
-            if key in parsed:
+            if key in parsed: #priorita alle chiavi che di solito contengono immagini grandi
                 url=extract_image_url(parsed[key])
                 if url:
                     return url
@@ -184,9 +194,11 @@ def extract_image_url(value: Any) -> str | None:
     return None
 
 
-#normalizziamo tutte le righe nel formato prodotto demo
+#Normalizziamo tutte le righe nel formato prodotto demo
+#Prima scegliamo le colonne reali usando gli alias,poi convertiamo ogni record
+#Il rischio principale sono righe incomplete:quelle senza titolo vengono scartate
 def normalize_rows(df: pd.DataFrame) -> pd.DataFrame:
-    columns={field: find_column(df,aliases) for field,aliases in COLUMN_ALIASES.items()}
+    columns={field: find_column(df,aliases) for field,aliases in COLUMN_ALIASES.items()} #mappa campo standard->colonna trovata
     #item id e titolo sono campi minimi obbligatori
     if columns["item_id"] is None or columns["title"] is None:
         raise ValueError("Input must contain at least item_id/parent_asin/asin and title/name.")
@@ -199,7 +211,7 @@ def normalize_rows(df: pd.DataFrame) -> pd.DataFrame:
         if not title:
             continue
 
-        rating_count=int(clean_number(row[columns["rating_count"]],0)) if columns["rating_count"] else 0
+        rating_count=int(clean_number(row[columns["rating_count"]],0)) if columns["rating_count"] else 0 #fallback se manca la colonna
         average_rating=(
             round(clean_number(row[columns["average_rating"]],0),2)
             if columns["average_rating"]
@@ -223,27 +235,31 @@ def normalize_rows(df: pd.DataFrame) -> pd.DataFrame:
         )
 
     #evitiamo duplicati sullo stesso item_id
-    normalized=pd.DataFrame(rows).drop_duplicates(subset=["item_id"])
+    normalized=pd.DataFrame(rows).drop_duplicates(subset=["item_id"]) #un solo record per prodotto
     return normalized
 
 
-#calcoliamo la baseline di popolarita
+#Calcoliamo la baseline di popolarita
+#Preferiamo il numero di rating perche indica visibilita/interazioni
+#Se manca,usiamo il rating medio come fallback debole
 def add_popularity_score(df: pd.DataFrame) -> pd.DataFrame:
     df=df.copy()
     max_count=df["rating_count"].max() if "rating_count" in df else 0
     #caso principale: rating_count normalizzato
     if max_count and max_count > 0:
-        df["popularity_score"]=(df["rating_count"] / max_count).round(4)
+        df["popularity_score"]=(df["rating_count"] / max_count).round(4) #normalizza tra 0 e 1
     #fallback: rating medio normalizzato
     elif "average_rating" in df and df["average_rating"].max() > 0:
-        df["popularity_score"]=(df["average_rating"] / 5.0).clip(0,1).round(4)
+        df["popularity_score"]=(df["average_rating"] / 5.0).clip(0,1).round(4) #limita valori fuori scala
     #fallback finale: nessuna popolarita disponibile
     else:
         df["popularity_score"]=0.0
     return df
 
 
-#selezioniamo un catalogo piccolo e bilanciato
+#Selezioniamo un catalogo piccolo e bilanciato
+#Prendiamo categorie principali e poi un numero simile di prodotti per categoria
+#Se alcune categorie non bastano,riempiamo con prodotti popolari rimasti
 def select_balanced_catalog(df: pd.DataFrame,limit: int) -> pd.DataFrame:
     #ordiniamo prima i prodotti piu recensiti
     df=df.sort_values(
@@ -254,7 +270,7 @@ def select_balanced_catalog(df: pd.DataFrame,limit: int) -> pd.DataFrame:
     #usiamo al massimo otto categorie principali
     categories=df["category"].value_counts().head(8).index.tolist()
     selected_frames=[]
-    per_category=max(1,math.ceil(limit / max(1,len(categories))))
+    per_category=max(1,math.ceil(limit / max(1,len(categories)))) #evita divisione per zero e garantisce almeno un item
 
     #prendiamo un numero simile di prodotti per categoria
     for category in categories:
@@ -265,7 +281,7 @@ def select_balanced_catalog(df: pd.DataFrame,limit: int) -> pd.DataFrame:
     #completiamo il limite se alcune categorie hanno pochi prodotti
     if len(selected) < limit:
         missing=limit - len(selected)
-        extra=df[~df["item_id"].isin(selected["item_id"])].head(missing)
+        extra=df[~df["item_id"].isin(selected["item_id"])].head(missing) #esclude duplicati gia scelti
         selected=pd.concat([selected,extra],ignore_index=True)
 
     return selected.head(limit).sort_values("popularity_score",ascending=False)
