@@ -3,11 +3,12 @@ from pathlib import Path
 from fastapi import FastAPI,HTTPException,Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from prototype.backend.schemas import AISearchRequest,AISearchResponse,CategorySummary,ClusteredSearchRequest,ClusteredSearchResponse,HealthResponse,Product,ProductQARequest,ProductQAResponse
+from prototype.backend.schemas import AISearchRequest,AISearchResponse,CategorySummary,ClusteredSearchRequest,ClusteredSearchResponse,HealthResponse,Product,ProductQARequest,ProductQAResponse,RecommendationProfile
 from prototype.backend.services.catalog_service import CatalogService
 from prototype.backend.services.ai_search_service import ai_search_products
 from prototype.backend.services.clustering_service import cluster_search_results
 from prototype.backend.services.product_qa_service import ProductQAService
+from prototype.backend.services.recommendation_service import DEMO_COLD_START_PROFILE_ID,DEMO_HYBRID_PROFILE_ID,RecommendationService
 from prototype.backend.services.search_service import search_products
 
 
@@ -16,6 +17,7 @@ from prototype.backend.services.search_service import search_products
 #Assumiamo che app.py resti dentro prototype/backend
 DATA_PATH=Path(__file__).resolve().parents[1] / "data" / "products_demo.json" #risale a prototype e punta al catalogo
 DATA_DIR=DATA_PATH.parent #cartella base per sorgenti QA/review
+RECOMMENDER_DIR=Path(__file__).resolve().parents[2] / "data" / "processed" / "electronics_recommender" #artifact notebook 03-05
 
 #Creiamo l'app FastAPI del prototipo
 #Qui definiamo anche CORS per permettere al frontend statico di chiamare il backend
@@ -35,6 +37,7 @@ app.add_middleware(
 #Questo rende la demo piu veloce ma richiede riavvio se cambiano i dati
 catalog=CatalogService(DATA_PATH) #indicizza prodotti per item_id
 product_qa_service=ProductQAService(DATA_DIR) #precarica sorgenti QA/review opzionali
+recommendation_service=RecommendationService(RECOMMENDER_DIR,catalog_products=catalog.all_products()) #limita consigli ai prodotti del sito
 
 
 #endpoint di controllo dello stato del backend
@@ -59,6 +62,8 @@ def products(
 @app.get("/products/{item_id}",response_model=Product)
 def product_detail(item_id: str) -> Product:
     product=catalog.get_product(item_id)
+    if product is None:
+        product=recommendation_service.get_product(item_id) #fallback per prodotti raccomandati dal dataset Electronics
     #se il prodotto non esiste restituiamo 404
     if product is None:
         raise HTTPException(status_code=404,detail="Product not found")
@@ -71,6 +76,8 @@ def product_detail(item_id: str) -> Product:
 @app.post("/products/{item_id}/qa",response_model=ProductQAResponse)
 def product_qa(item_id: str,request: ProductQARequest) -> ProductQAResponse:
     product=catalog.get_product(item_id)
+    if product is None:
+        product=recommendation_service.get_product(item_id)
     if product is None:
         raise HTTPException(status_code=404,detail="Product not found")
     if not request.question.strip(): #evita richieste vuote che renderebbero inutile il retrieval
@@ -92,6 +99,33 @@ def categories() -> list[CategorySummary]:
 @app.get("/popular",response_model=list[Product])
 def popular(limit: int=Query(default=20,ge=1,le=200)) -> list[Product]:
     return catalog.popular(limit=limit)
+
+
+#Endpoint profili demo per il recommender
+#Il frontend lo usa per scegliere tra utente caldo ibrido e cold start
+#I profili sono fissi e riproducibili per la demo
+@app.get("/recommendation-profiles",response_model=list[RecommendationProfile])
+def recommendation_profiles() -> list[RecommendationProfile]:
+    return recommendation_service.profiles()
+
+
+#Endpoint raccomandazioni generali
+#Default: profilo caldo con HybridGrid_SVD4_010_Content_035_Pop_055
+#Cold start: profilo senza storico che usa MostPopular baseline
+@app.get("/recommendations",response_model=list[Product])
+def recommendations(
+    profile_id: str | None=DEMO_HYBRID_PROFILE_ID,
+    limit: int=Query(default=12,ge=1,le=200),
+) -> list[Product]:
+    return recommendation_service.recommend(profile_id=profile_id,limit=limit)
+
+
+#Endpoint compatibility per popup estensione e vecchie note
+#Espone esplicitamente la baseline popularity del recommender
+#Resta diverso da /popular,che usa il catalogo locale demo
+@app.get("/recommendations/popular",response_model=list[Product])
+def recommendation_popular(limit: int=Query(default=12,ge=1,le=200)) -> list[Product]:
+    return recommendation_service.recommend(profile_id=DEMO_COLD_START_PROFILE_ID,limit=limit)
 
 
 #Endpoint ricerca testuale base

@@ -1,5 +1,6 @@
 //URL base del backend FastAPI
 const BASE_API_URL = "http://localhost:8000";
+const RECOMMENDATION_PROFILE_STORAGE_KEY = "recommendationProfileId";
 
 //Stato minimale condiviso dalla pagina catalogo
 //Tiene separati prodotti correnti,ricerca AI e cluster per non perdere i dati originali
@@ -7,6 +8,7 @@ const BASE_API_URL = "http://localhost:8000";
 const state = {
   categories: [],
   currentProducts: [],
+  recommendationProfiles: [],
   priceFilterActive: false,
   aiSearch: null,
   clusteredSearch: null,
@@ -29,8 +31,8 @@ document.addEventListener("DOMContentLoaded", () => {
 //Carica dati iniziali in parallelo dove possibile
 //Poi collega tutti i controlli della UI alle funzioni di filtro/ricerca
 async function initCatalogPage() {
-  await loadCategories();
-  await Promise.all([loadInitialProducts(), loadPopularProducts()]);
+  await Promise.all([loadCategories(), loadRecommendationProfiles()]);
+  await loadPopularProducts();
 
   //click sul bottone Cerca
   document.getElementById("searchButton").addEventListener("click", runSearch);
@@ -81,6 +83,7 @@ async function initProductPage() {
   }
 
   setupProductQa(itemId);
+  await loadRecommendationProfiles();
   await Promise.all([loadProductDetail(itemId), loadRecommendations()]);
 }
 
@@ -131,25 +134,112 @@ async function loadCategories() {
   }
 }
 
-//carica i primi prodotti del catalogo
-async function loadInitialProducts() {
-  await runSearch();
-}
-
 //carica la sezione prodotti popolari
 async function loadPopularProducts() {
   try {
-    const products = await fetchJson("/popular?limit=12");
+    const products = await fetchRecommendations(12);
     renderProducts("popularGrid", products);
   } catch (error) {
-    renderMessage("popularGrid", "Prodotti popolari non disponibili.");
+    renderMessage("popularGrid", "Raccomandazioni non disponibili.");
   }
+}
+
+//Carica i profili demo usati dal recommender
+//Il backend restituisce un utente caldo ibrido e un cold start popularity
+//Il profilo selezionato viene salvato in localStorage per restare coerente tra pagine
+async function loadRecommendationProfiles() {
+  try {
+    state.recommendationProfiles = await fetchJson("/recommendation-profiles");
+  } catch (error) {
+    state.recommendationProfiles = [];
+  }
+  setupRecommendationProfileSelect();
+}
+
+//Popola la select del profilo demo quando presente nella pagina
+//Se manca una scelta salvata,usa il primo profilo restituito dal backend
+//Al cambio profilo ricarica solo la sezione raccomandazioni
+function setupRecommendationProfileSelect() {
+  const select = document.getElementById("recommendationProfileSelect");
+  if (!select) {
+    return;
+  }
+  select.innerHTML = "";
+  state.recommendationProfiles.forEach((profile) => {
+    const option = document.createElement("option");
+    option.value = profile.profile_id;
+    option.textContent = profile.label;
+    select.appendChild(option);
+  });
+
+  const selectedProfileId = getSelectedRecommendationProfileId();
+  if (selectedProfileId) {
+    select.value = selectedProfileId;
+  }
+
+  select.addEventListener("change", () => {
+    localStorage.setItem(RECOMMENDATION_PROFILE_STORAGE_KEY, select.value);
+    updateRecommendationProfileInfo();
+    if (document.body.dataset.page === "catalog") {
+      loadPopularProducts();
+    }
+    if (document.body.dataset.page === "product") {
+      loadRecommendations();
+    }
+  });
+  updateRecommendationProfileInfo();
+}
+
+//Restituisce il profilo demo selezionato
+//Controlla prima localStorage,poi fallback sul primo profilo disponibile
+//Se il backend non risponde,usa l'id del profilo ibrido previsto
+function getSelectedRecommendationProfileId() {
+  const savedProfileId = localStorage.getItem(RECOMMENDATION_PROFILE_STORAGE_KEY);
+  const validIds = new Set(state.recommendationProfiles.map((profile) => profile.profile_id));
+  if (savedProfileId && validIds.has(savedProfileId)) {
+    return savedProfileId;
+  }
+  return state.recommendationProfiles[0]?.profile_id || "demo_hybrid";
+}
+
+//Aggiorna descrizione del modello sotto il titolo Consigliati
+//Serve a rendere chiaro se stiamo usando HybridGrid o MostPopular
+//La descrizione arriva direttamente dal backend
+function updateRecommendationProfileInfo() {
+  const info = document.getElementById("recommendationModelInfo");
+  if (!info) {
+    return;
+  }
+  const profileId = getSelectedRecommendationProfileId();
+  const profile = state.recommendationProfiles.find((item) => item.profile_id === profileId);
+  if (!profile) {
+    info.textContent = "HybridGrid demo";
+    return;
+  }
+  info.textContent = `${profile.model} - ${profile.description}`;
+}
+
+//Chiama l'endpoint raccomandazioni usando il profilo demo corrente
+//Default backend: profilo caldo HybridGrid_SVD4_010_Content_035_Pop_055
+//Profilo cold start: popularity baseline
+async function fetchRecommendations(limit) {
+  const profileId = getSelectedRecommendationProfileId();
+  const params = new URLSearchParams({
+    profile_id: profileId,
+    limit: String(limit),
+  });
+  return fetchJson(`/recommendations?${params.toString()}`);
 }
 
 //Esegue ricerca testuale con eventuale filtro categoria
 //Se il clustering e attivo chiama endpoint cluster,altrimenti ricerca locale o AI
 //Dopo ogni ricerca resetta filtri prezzo per allinearli ai nuovi risultati
 async function runSearch() {
+  const resultsSection = document.getElementById("catalogResultsSection");
+  if (resultsSection) {
+    resultsSection.classList.remove("hidden");
+  }
+
   const query = document.getElementById("searchInput").value.trim();
   const question = document.getElementById("aiQuestionInput").value.trim();
   const category = document.getElementById("categorySelect").value;
@@ -412,7 +502,7 @@ async function loadProductDetail(itemId) {
 //carica raccomandazioni usando i prodotti popolari
 async function loadRecommendations() {
   try {
-    const products = await fetchJson("/popular?limit=8");
+    const products = await fetchRecommendations(8);
     renderProducts("recommendationsGrid", products);
   } catch (error) {
     renderMessage("recommendationsGrid", "Consigli non disponibili.");

@@ -16,6 +16,19 @@ class Product(BaseModel):
     image_url: str | None=None
 
 
+#Profilo demo usato per scegliere il comportamento del recommender
+#Il profilo caldo usa uno user_idx reale del dataset
+#Il profilo cold start non ha storico e usa solo popularity
+class RecommendationProfile(BaseModel):
+    profile_id: str
+    label: str
+    description: str
+    model: str
+    user_idx: int | None=None
+    user_id: str | None=None
+    cold_start: bool=False
+
+
 #schema categoria con numero di prodotti
 class CategorySummary(BaseModel):
     category: str

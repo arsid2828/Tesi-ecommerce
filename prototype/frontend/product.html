@@ -4,13 +4,21 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Dettaglio prodotto</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=hybrid-demo-2">
   </head>
   <body data-page="product">
     <!--intestazione pagina dettaglio-->
     <header class="site-header compact">
-      <a class="back-link" href="index.html">Torna al catalogo</a>
-      <h1>Dettaglio prodotto</h1>
+      <div class="header-main">
+        <div>
+          <a class="back-link" href="index.html">Torna al catalogo</a>
+          <h1>Dettaglio prodotto</h1>
+        </div>
+        <label class="field compact-field profile-field header-profile-field">
+          <span>Profilo demo</span>
+          <select id="recommendationProfileSelect"></select>
+        </label>
+      </div>
     </header>
 
     <!--contenuto principale della pagina prodotto-->
@@ -34,17 +42,19 @@
         <div id="qaEvidence" class="qa-evidence hidden"></div>
       </section>
 
-      <!--raccomandazioni baseline MostPopular-->
+      <!--raccomandazioni da profilo demo-->
       <section class="content-section">
         <div class="section-heading">
-          <h2>Consigliati</h2>
-          <p>Baseline MostPopular</p>
+          <div>
+            <h2>Consigliati</h2>
+            <p id="recommendationModelInfo">Caricamento profilo...</p>
+          </div>
         </div>
         <div id="recommendationsGrid" class="product-grid"></div>
       </section>
     </main>
 
     <!--logica frontend vanilla JS-->
-    <script src="app.js"></script>
+    <script src="app.js?v=hybrid-demo-3"></script>
   </body>
 </html>

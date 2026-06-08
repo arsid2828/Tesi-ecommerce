@@ -71,6 +71,14 @@ body {
   z-index: 1;
 }
 
+/*layout header con selettore profilo a destra*/
+.header-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
 /*header compatto per pagina dettaglio*/
 .site-header.compact {
   padding-bottom: 24px;
@@ -189,6 +197,27 @@ body {
 /*campo compatto dentro gruppi filtro*/
 .compact-field {
   gap: 4px;
+}
+
+/*selettore profilo demo nelle sezioni consigliati*/
+.profile-field {
+  width: min(260px, 100%);
+}
+
+/*selettore profilo globale in alto a destra*/
+.header-profile-field {
+  flex: 0 0 min(280px, 34vw);
+  color: #dbe6ee;
+  text-align: left;
+}
+
+.header-profile-field span {
+  color: #dbe6ee;
+}
+
+.header-profile-field select {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.96);
 }
 
 /*checkbox filtro clustering*/
@@ -978,6 +1007,16 @@ button {
   .product-detail,
   .qa-form {
     grid-template-columns: 1fr;
+  }
+
+  .header-main {
+    display: grid;
+    gap: 16px;
+  }
+
+  .header-profile-field {
+    width: 100%;
+    flex-basis: auto;
   }
 
   .cluster-heading,

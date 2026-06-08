@@ -4,14 +4,20 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Product Discovery Prototype</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=hybrid-demo-2">
   </head>
   <body data-page="catalog">
     <!--intestazione principale del prototipo-->
     <header class="site-header">
-      <div>
-        <h1>Product Discovery Prototype</h1>
-        <p class="intro">Catalogo demo Amazon-like con ricerca testuale e ordinamento MostPopular.</p>
+      <div class="header-main">
+        <div>
+          <h1>Product Discovery Prototype</h1>
+          <p class="intro">Catalogo demo Amazon-like con ricerca,filtri e consigli HybridGrid.</p>
+        </div>
+        <label class="field compact-field profile-field header-profile-field">
+          <span>Profilo demo</span>
+          <select id="recommendationProfileSelect"></select>
+        </label>
       </div>
     </header>
 
@@ -81,8 +87,19 @@
         </aside>
 
         <div class="results-area">
-          <!--griglia risultati ricerca-->
+          <!--griglia raccomandazioni hybrid/cold start-->
           <section class="content-section first-section">
+            <div class="section-heading">
+              <div>
+                <h2>Consigliati</h2>
+                <p id="recommendationModelInfo">Caricamento profilo...</p>
+              </div>
+            </div>
+            <div id="popularGrid" class="product-grid compact-grid"></div>
+          </section>
+
+          <!--griglia risultati ricerca-->
+          <section id="catalogResultsSection" class="content-section hidden">
             <div class="section-heading">
               <h2>Risultati</h2>
               <p id="resultsCount"></p>
@@ -90,19 +107,11 @@
             <div id="aiSearchNotice" class="ai-search-notice hidden"></div>
             <div id="resultsGrid" class="product-grid"></div>
           </section>
-
-          <!--griglia prodotti ordinati per popolarita-->
-          <section class="content-section">
-            <div class="section-heading">
-              <h2>Prodotti popolari</h2>
-            </div>
-            <div id="popularGrid" class="product-grid compact-grid"></div>
-          </section>
         </div>
       </div>
     </main>
 
     <!--logica frontend vanilla JS-->
-    <script src="app.js"></script>
+    <script src="app.js?v=hybrid-demo-3"></script>
   </body>
 </html>
