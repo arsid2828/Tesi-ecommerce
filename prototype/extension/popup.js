@@ -1,8 +1,8 @@
 const BACKEND_URL = "http://localhost:8000";
-const PRODUCT_PAGE_ORIGIN = "http://localhost:3000";
 
 const popupState = {
   itemId: null,
+  amazonProduct: null,
 };
 
 document.addEventListener("DOMContentLoaded", initPopup);
@@ -13,10 +13,9 @@ async function initPopup() {
   const currentUrl = tab && tab.url ? tab.url : "";
 
   setText("currentUrl", currentUrl || "URL non disponibile");
-  updateProductPageState(currentUrl);
-
   document.getElementById("loadProductButton").addEventListener("click", loadCurrentProduct);
 
+  await updateProductPageState(tab, currentUrl);
   await Promise.all([checkBackendStatus(), loadRecommendations()]);
 }
 
@@ -29,35 +28,76 @@ function getActiveTab() {
   });
 }
 
-//controlla se la URL appartiene alla pagina dettaglio locale
-function updateProductPageState(currentUrl) {
-  const itemId = getItemIdFromProductUrl(currentUrl);
-  popupState.itemId = itemId;
+//controlla se la tab contiene una pagina prodotto locale o Amazon
+async function updateProductPageState(tab, currentUrl) {
+  const product = await detectActiveProduct(tab, currentUrl);
+  const button = document.getElementById("loadProductButton");
+  popupState.itemId = null;
+  popupState.amazonProduct = null;
+  button.textContent = "Carica prodotto";
 
-  if (!itemId) {
-    setText("productPageStatus", "Non sei su una pagina prodotto locale.");
-    setText("itemIdValue", "item_id non rilevato");
-    document.getElementById("loadProductButton").disabled = true;
+  if (!product) {
+    setText("productPageStatus", "Non sei su una pagina prodotto riconosciuta.");
+    setText("itemIdValue", "item_id/ASIN non rilevato");
+    button.disabled = true;
+    setResultText("Apri una pagina prodotto locale o Amazon.");
     return;
   }
 
+  if (product.kind === "amazon") {
+    popupState.amazonProduct = product;
+    setText("productPageStatus", "Prodotto Amazon rilevato.");
+    setText("itemIdValue", `ASIN: ${product.asin}`);
+    button.textContent = "Solo riconoscimento";
+    button.disabled = true;
+    renderAmazonProduct(product);
+    return;
+  }
+
+  popupState.itemId = product.itemId;
   setText("productPageStatus", "Pagina prodotto locale rilevata.");
-  setText("itemIdValue", itemId);
-  document.getElementById("loadProductButton").disabled = false;
+  setText("itemIdValue", product.itemId);
+  button.disabled = false;
+  setResultText("Nessun prodotto caricato.");
 }
 
-//estrae item_id solo dalla pagina product.html locale
-function getItemIdFromProductUrl(currentUrl) {
-  try {
-    const url = new URL(currentUrl);
-    if (url.origin !== PRODUCT_PAGE_ORIGIN || !url.pathname.endsWith("/product.html")) {
-      return null;
-    }
-    const params = new URLSearchParams(url.search);
-    return params.get("id");
-  } catch (error) {
-    return null;
+//usa il detector URL e, quando possibile, integra i dati letti dal content script
+async function detectActiveProduct(tab, currentUrl) {
+  const urlProduct = window.ThesisProductDetector.detectFromUrl(currentUrl);
+  const pageProduct = await requestDetectedProduct(tab);
+
+  if (!pageProduct) {
+    return urlProduct;
   }
+
+  if (!urlProduct || urlProduct.kind === pageProduct.kind) {
+    return {
+      ...urlProduct,
+      ...pageProduct,
+    };
+  }
+
+  return urlProduct;
+}
+
+//richiede al content script i dati gia letti dalla pagina attiva
+function requestDetectedProduct(tab) {
+  return new Promise((resolve) => {
+    if (!tab || typeof tab.id === "undefined" || !chrome.tabs || !chrome.tabs.sendMessage) {
+      resolve(null);
+      return;
+    }
+
+    const timeoutId = setTimeout(() => resolve(null), 500);
+    chrome.tabs.sendMessage(tab.id, { type: "GET_DETECTED_PRODUCT" }, (response) => {
+      clearTimeout(timeoutId);
+      if (chrome.runtime.lastError || !response || !response.product) {
+        resolve(null);
+        return;
+      }
+      resolve(response.product);
+    });
+  });
 }
 
 //wrapper GET per il backend locale
@@ -85,6 +125,11 @@ async function checkBackendStatus() {
 //carica dettaglio prodotto quando disponibile un item_id
 async function loadCurrentProduct() {
   const result = document.getElementById("productResult");
+  if (popupState.amazonProduct) {
+    renderAmazonProduct(popupState.amazonProduct);
+    return;
+  }
+
   if (!popupState.itemId) {
     result.textContent = "Apri una pagina prodotto locale prima di caricare il prodotto.";
     result.className = "result-box error-text";
@@ -133,6 +178,46 @@ function renderProduct(product) {
   info.appendChild(title);
   info.appendChild(rating);
   info.appendChild(reviews);
+  layout.appendChild(imageBox);
+  layout.appendChild(info);
+  result.appendChild(layout);
+}
+
+//mostra il prodotto Amazon riconosciuto senza chiamare il backend
+function renderAmazonProduct(product) {
+  const result = document.getElementById("productResult");
+  result.innerHTML = "";
+  result.className = "result-box";
+
+  const layout = document.createElement("div");
+  layout.className = "popup-product-layout";
+
+  const imageBox = createProductImage({
+    image_url: product.imageUrl,
+    title: product.title || product.asin,
+  }, "popup-product-image");
+
+  const info = document.createElement("div");
+  info.className = "popup-product-info";
+
+  const source = document.createElement("p");
+  source.className = "category-line";
+  source.textContent = "Amazon reale";
+
+  const title = document.createElement("h2");
+  title.textContent = product.title || "Titolo non disponibile";
+
+  const asin = document.createElement("p");
+  asin.textContent = `ASIN: ${product.asin}`;
+
+  const note = document.createElement("p");
+  note.className = "muted-text";
+  note.textContent = "Riconoscimento prodotto attivo.";
+
+  info.appendChild(source);
+  info.appendChild(title);
+  info.appendChild(asin);
+  info.appendChild(note);
   layout.appendChild(imageBox);
   layout.appendChild(info);
   result.appendChild(layout);
@@ -235,4 +320,11 @@ function formatRating(value) {
 //assegna testo a un elemento
 function setText(elementId, value) {
   document.getElementById(elementId).textContent = value;
+}
+
+//assegna il testo al box risultato
+function setResultText(value) {
+  const result = document.getElementById("productResult");
+  result.textContent = value;
+  result.className = "result-box muted-text";
 }

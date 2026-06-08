@@ -465,6 +465,17 @@ body.extension-popup .empty-list-item {
   color: #667381;
 }
 
+/*variante box su Amazon reale*/
+.thesis-extension-box.amazon-detected {
+  max-width: 720px;
+}
+
+/*titolo prodotto rilevato nel box pagina*/
+.thesis-extension-box .thesis-extension-product-title {
+  color: #18222d;
+  font-weight: 700;
+}
+
 /*stato backend nel box pagina*/
 .thesis-extension-box .thesis-extension-status {
   color: #095f5b;
