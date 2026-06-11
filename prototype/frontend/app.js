@@ -28,12 +28,15 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 //Inizializza catalogo,categorie e listener della ricerca
-//Carica dati iniziali in parallelo dove possibile
-//Poi collega tutti i controlli della UI alle funzioni di filtro/ricerca
+//I controlli vengono collegati subito,cosi Applica non resta muto durante i caricamenti iniziali
 async function initCatalogPage() {
+  setupCatalogControls();
   await Promise.all([loadCategories(), loadRecommendationProfiles()]);
   await loadPopularProducts();
+}
 
+//Collega tutti i controlli della UI alle funzioni di filtro/ricerca
+function setupCatalogControls() {
   //click sul bottone Cerca
   document.getElementById("searchButton").addEventListener("click", runSearch);
   //invio nella barra di ricerca
@@ -239,6 +242,9 @@ async function runSearch() {
   if (resultsSection) {
     resultsSection.classList.remove("hidden");
   }
+  setSearchLoading(true);
+  document.getElementById("resultsCount").textContent = "Caricamento...";
+  renderMessage("resultsGrid", "Caricamento risultati...");
 
   const query = document.getElementById("searchInput").value.trim();
   const question = document.getElementById("aiQuestionInput").value.trim();
@@ -266,9 +272,32 @@ async function runSearch() {
     state.priceFilterActive = false;
     updatePriceControls(products); //ricalcola min/max slider sui nuovi risultati
     applyCatalogFilters();
+    scrollResultsIntoView();
   } catch (error) {
     renderMessage("resultsGrid", "Ricerca non disponibile.");
+  } finally {
+    setSearchLoading(false);
   }
+}
+
+//Mostra all'utente che Applica ha avviato davvero una nuova ricerca
+//Questo e utile soprattutto quando il clustering parte senza query testuale
+function setSearchLoading(isLoading) {
+  const button = document.getElementById("searchButton");
+  if (!button) {
+    return;
+  }
+  button.disabled = isLoading;
+  button.textContent = isLoading ? "Caricamento..." : "Applica";
+}
+
+//Dopo una ricerca porta in vista i risultati, evitando l'impressione che non sia successo nulla
+function scrollResultsIntoView() {
+  const section = document.getElementById("catalogResultsSection");
+  if (!section) {
+    return;
+  }
+  section.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 //Usa Gemini solo quando l'utente ha scritto una domanda/esigenza
@@ -307,7 +336,7 @@ async function runClusteredSearch(query, category) {
     query,
     category: category || null,
     limit: 500,
-    use_ai_labels: true,
+    use_ai_labels: false, //mantiene il clustering della UI rapido; il backend supporta ancora Gemini se richiesto
   });
 }
 
@@ -680,26 +709,43 @@ function renderClusters(containerId, clusters) {
   });
 }
 
-//mostra risposta AI o avviso fallback sopra la griglia risultati
+//mostra risposta AI oppure stato della ricerca clusterizzata sopra la griglia risultati
 function renderAiSearchNotice() {
   const notice = document.getElementById("aiSearchNotice");
   if (!notice) {
     return;
   }
-  if (!state.aiSearch) {
-    notice.classList.add("hidden");
-    notice.innerHTML = "";
+  if (state.aiSearch) {
+    const title = state.aiSearch.fallback ? "Avviso" : "Risposta AI";
+    notice.className = state.aiSearch.fallback
+      ? "ai-search-notice fallback"
+      : "ai-search-notice";
+    notice.innerHTML = `
+      <strong>${escapeHtml(title)}</strong>
+      <p>${escapeHtml(state.aiSearch.answer || "")}</p>
+    `;
     return;
   }
 
-  const title = state.aiSearch.fallback ? "Avviso" : "Risposta AI";
-  notice.className = state.aiSearch.fallback
-    ? "ai-search-notice fallback"
-    : "ai-search-notice";
-  notice.innerHTML = `
-    <strong>${escapeHtml(title)}</strong>
-    <p>${escapeHtml(state.aiSearch.answer || "")}</p>
-  `;
+  if (state.clusteredSearch) {
+    const clusterCount = Number((state.clusteredSearch.clusters || []).length);
+    const totalResults = Number(state.clusteredSearch.total_results || 0);
+    const labelSource = state.clusteredSearch.used_ai_labels
+      ? "etichette generate con Gemini"
+      : "etichette locali";
+    const message = state.clusteredSearch.clustered
+      ? `${clusterCount} cluster creati sui ${totalResults} risultati con ${labelSource}.`
+      : `Risultati mostrati in un unico gruppo con ${labelSource}.`;
+    notice.className = "ai-search-notice";
+    notice.innerHTML = `
+      <strong>Risultati raggruppati</strong>
+      <p>${escapeHtml(message)}</p>
+    `;
+    return;
+  }
+
+  notice.classList.add("hidden");
+  notice.innerHTML = "";
 }
 
 //Crea una card prodotto riutilizzabile
