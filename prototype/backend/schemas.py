@@ -16,107 +16,61 @@ class Product(BaseModel):
     image_url: str | None=None
 
 
-#Profilo demo usato per scegliere il comportamento del recommender
-#Il profilo caldo usa uno user_idx reale del dataset
-#Il profilo cold start non ha storico e usa solo popularity
-class RecommendationProfile(BaseModel):
-    profile_id: str
-    label: str
-    description: str
-    model: str
-    user_idx: int | None=None
-    user_id: str | None=None
-    cold_start: bool=False
-
-
-#schema categoria con numero di prodotti
-class CategorySummary(BaseModel):
-    category: str
-    count: int
-
-
 #schema risposta per health check
 class HealthResponse(BaseModel):
     status: str
 
 
-#richiesta per ricerca assistita da Gemini
-class AISearchRequest(BaseModel):
+#Richiesta per la nuova product discovery AI-first
+#La query e l'unico input utente: niente filtri manuali nel frontend
+class DiscoverySearchRequest(BaseModel):
     query: str=""
-    question: str | None=None
-    category: str | None=None
-    limit: int=10
+    limit: int=Field(default=80,ge=1,le=200)
+    use_ai_support: bool=True
 
 
-#risultato prodotto con spiegazione AI opzionale
-class AISearchResult(Product):
-    ai_score: float | None=None
-    ai_reason: str | None=None
-
-
-#risposta completa del nuovo endpoint AI
-class AISearchResponse(BaseModel):
-    query: str
-    question: str | None=None
-    mode: str
-    answer: str
-    results: list[AISearchResult]
-    fallback: bool=False
-
-
-#Richiesta per ricerca con clustering sui risultati gia filtrati
-#Field impone limiti direttamente nello schema,prima che arrivi alla logica
-#Questo evita richieste troppo grandi o non valide
-class ClusteredSearchRequest(BaseModel):
-    query: str=""
-    category: str | None=None
-    limit: int=Field(default=40,ge=1,le=600) #vincola il numero di risultati accettato
-    use_ai_labels: bool=True
-
-
-#Singolo cluster di prodotti
-#products contiene gli oggetti originali,non solo gli id
-#keywords e reason servono per rendere spiegabile il raggruppamento
-class ProductCluster(BaseModel):
-    cluster_id: str
-    label: str
-    description: str
-    size: int
-    keywords: list[str]
-    products: list[Product]
-    reason: str | None=None
-
-
-#risposta della ricerca clusterizzata
-class ClusteredSearchResponse(BaseModel):
-    query: str
-    total_results: int
-    clustered: bool
-    clusters: list[ProductCluster]
-    used_ai_labels: bool=False
-    fallback: bool=False
-
-
-#richiesta per QA grounded sul prodotto
-class ProductQARequest(BaseModel):
-    question: str
-    use_ai: bool=True
-
-
-#evidenza testuale usata nella risposta QA
-class ProductQAEvidence(BaseModel):
+#Evidenza locale usata per spiegare un prodotto in un ruolo
+#source resta tecnica,source_label e il testo leggibile per la UI
+class DiscoveryEvidence(BaseModel):
     source: str
+    source_label: str
     text: str
     score: float
 
 
-#Risposta QA del prodotto
-#evidence mantiene traccia dei testi usati,cosi la risposta resta verificabile
-#used_ai separa risposta generata da fallback locale
-class ProductQAResponse(BaseModel):
-    item_id: str
-    question: str
+#Prodotto arricchito con motivazione ed evidenze locali
+class DiscoveryProduct(Product):
+    role_reason: str
+    match_score: float
+    evidence_sources: list[str]=Field(default_factory=list)
+    evidence: list[DiscoveryEvidence]=Field(default_factory=list)
+
+
+#Gruppo/cluster costruito per ruolo d'acquisto
+#I prodotti sono scelti localmente; Gemini puo solo aiutare con copy e label
+class DiscoveryRoleGroup(BaseModel):
+    role_id: str
+    label: str
+    description: str
+    size: int
+    keywords: list[str]=Field(default_factory=list)
+    products: list[DiscoveryProduct]
+    reason: str | None=None
+
+
+#Risposta della discovery a ruoli
+class DiscoverySearchResponse(BaseModel):
+    query: str
     answer: str
-    confidence: str
-    used_ai: bool
-    evidence: list[ProductQAEvidence]
+    total_candidates: int
+    groups: list[DiscoveryRoleGroup]
+    source_summary: dict[str,int]=Field(default_factory=dict)
+    used_ai_support: bool=False
+    fallback: bool=False
+
+
+#Evidenza testuale recuperata localmente da QA/recensioni per spiegare la discovery
+class ProductQAEvidence(BaseModel):
+    source: str
+    text: str
+    score: float

@@ -4,20 +4,16 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Dettaglio prodotto</title>
-    <link rel="stylesheet" href="style.css?v=hybrid-demo-2">
+    <link rel="stylesheet" href="style.css?v=mission-cleanup-1">
   </head>
   <body data-page="product">
     <!--intestazione pagina dettaglio-->
     <header class="site-header compact">
       <div class="header-main">
         <div>
-          <a class="back-link" href="index.html">Torna al catalogo</a>
+          <a class="back-link" href="index.html?v=mission-cleanup-1">Torna al catalogo</a>
           <h1>Dettaglio prodotto</h1>
         </div>
-        <label class="field compact-field profile-field header-profile-field">
-          <span>Profilo demo</span>
-          <select id="recommendationProfileSelect"></select>
-        </label>
       </div>
     </header>
 
@@ -25,36 +21,9 @@
     <main class="page-shell">
       <!--dettaglio prodotto caricato via API-->
       <section id="productDetail" class="product-detail"></section>
-
-      <!--chat QA grounded sui dati del prodotto-->
-      <section class="content-section qa-section" aria-labelledby="qaTitle">
-        <div class="section-heading">
-          <h2 id="qaTitle">Domande sul prodotto</h2>
-        </div>
-        <form id="qaForm" class="qa-form">
-          <label class="field">
-            <span>Domanda</span>
-            <input id="qaQuestionInput" type="text" placeholder="Es. La batteria dura tanto?">
-          </label>
-          <button id="qaSubmitButton" class="primary-button" type="submit">Chiedi</button>
-        </form>
-        <div id="qaAnswer" class="qa-answer hidden"></div>
-        <div id="qaEvidence" class="qa-evidence hidden"></div>
-      </section>
-
-      <!--raccomandazioni da profilo demo-->
-      <section class="content-section">
-        <div class="section-heading">
-          <div>
-            <h2>Consigliati</h2>
-            <p id="recommendationModelInfo">Caricamento profilo...</p>
-          </div>
-        </div>
-        <div id="recommendationsGrid" class="product-grid"></div>
-      </section>
     </main>
 
     <!--logica frontend vanilla JS-->
-    <script src="app.js?v=hybrid-demo-3"></script>
+    <script src="app.js?v=mission-cleanup-1"></script>
   </body>
 </html>

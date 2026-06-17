@@ -1,110 +1,75 @@
 //URL base del backend FastAPI
 const BASE_API_URL = "http://localhost:8000";
-const RECOMMENDATION_PROFILE_STORAGE_KEY = "recommendationProfileId";
 
-//Stato minimale condiviso dalla pagina catalogo
-//Tiene separati prodotti correnti,ricerca AI e cluster per non perdere i dati originali
-//I filtri frontend lavorano su currentProducts senza richiamare sempre il backend
 const state = {
-  categories: [],
-  currentProducts: [],
-  recommendationProfiles: [],
-  priceFilterActive: false,
-  aiSearch: null,
-  clusteredSearch: null,
+  discovery: null,
 };
 
-//scegliamo quale pagina inizializzare in base al data attribute
 document.addEventListener("DOMContentLoaded", () => {
   const page = document.body.dataset.page;
-  //home catalogo
   if (page === "catalog") {
     initCatalogPage();
   }
-  //pagina dettaglio prodotto
   if (page === "product") {
     initProductPage();
   }
 });
 
-//Inizializza catalogo,categorie e listener della ricerca
-//I controlli vengono collegati subito,cosi Applica non resta muto durante i caricamenti iniziali
-async function initCatalogPage() {
-  setupCatalogControls();
-  await Promise.all([loadCategories(), loadRecommendationProfiles()]);
-  await loadPopularProducts();
+function initCatalogPage() {
+  setupDiscoveryControls();
+  runInitialQueryFromUrl();
 }
 
-//Collega tutti i controlli della UI alle funzioni di filtro/ricerca
-function setupCatalogControls() {
-  //click sul bottone Cerca
-  document.getElementById("searchButton").addEventListener("click", runSearch);
-  //invio nella barra di ricerca
-  document.getElementById("searchInput").addEventListener("keydown", (event) => {
+function setupDiscoveryControls() {
+  const form = document.getElementById("discoveryForm");
+  const input = document.getElementById("searchInput");
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    runDiscoverySearch();
+  });
+  input.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
-      runSearch();
+      event.preventDefault();
+      runDiscoverySearch();
     }
   });
-  document.getElementById("aiQuestionInput").addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      runSearch();
-    }
+  document.querySelectorAll(".example-chip").forEach((button) => {
+    button.addEventListener("click", () => {
+      input.value = button.dataset.query || "";
+      runDiscoverySearch();
+    });
   });
-  //cambio categoria
-  document.getElementById("categorySelect").addEventListener("change", runSearch);
-  //attiva/disattiva clustering dei risultati lato backend
-  document.getElementById("clusterSearchCheckbox").addEventListener("change", runSearch);
-  //cambio ordinamento
-  document.getElementById("sortSelect").addEventListener("change", applyCatalogFilters);
-  //slider prezzo minimo
-  document.getElementById("minPriceInput").addEventListener("input", () => {
-    syncPriceRange("min");
-    applyCatalogFilters();
-  });
-  //slider prezzo massimo
-  document.getElementById("maxPriceInput").addEventListener("input", () => {
-    syncPriceRange("max");
-    applyCatalogFilters();
-  });
-  //filtro rating minimo
-  document.getElementById("minRatingSelect").addEventListener("change", applyCatalogFilters);
-  //filtro recensioni minime
-  document.getElementById("minReviewsInput").addEventListener("input", applyCatalogFilters);
-  //reset filtri laterali
-  document.getElementById("resetFiltersButton").addEventListener("click", resetFilters);
 }
 
-//inizializza la pagina dettaglio leggendo item_id dalla query string
+function runInitialQueryFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const query = params.get("q");
+  if (!query) {
+    return;
+  }
+  const input = document.getElementById("searchInput");
+  input.value = query;
+  runDiscoverySearch();
+}
+
 async function initProductPage() {
   const params = new URLSearchParams(window.location.search);
   const itemId = params.get("id");
-  //senza id non possiamo caricare il prodotto
   if (!itemId) {
     renderMessage("productDetail", "Prodotto non specificato.");
-    disableProductQa();
     return;
   }
-
-  setupProductQa(itemId);
-  await loadRecommendationProfiles();
-  await Promise.all([loadProductDetail(itemId), loadRecommendations()]);
+  await loadProductDetail(itemId);
 }
 
-//Wrapper semplice per chiamate GET al backend
-//Centralizza gestione errori HTTP
-//Chi chiama puo usare try/catch senza duplicare controlli response.ok
 async function fetchJson(path) {
   const response = await fetch(`${BASE_API_URL}${path}`);
-  //gestiamo errori HTTP come eccezioni
   if (!response.ok) {
     throw new Error(`Errore API: ${response.status}`);
   }
   return response.json();
 }
 
-//Wrapper per chiamate POST JSON al backend
-//Converte il body in JSON e imposta Content-Type
-//Viene usato per AI search,clustering e QA prodotto
 async function postJson(path, body) {
   const response = await fetch(`${BASE_API_URL}${path}`, {
     method: "POST",
@@ -119,588 +84,129 @@ async function postJson(path, body) {
   return response.json();
 }
 
-//carica categorie e popola il filtro select
-async function loadCategories() {
-  try {
-    state.categories = await fetchJson("/categories");
-    const select = document.getElementById("categorySelect");
-    //creiamo una option per ogni categoria
-    state.categories.forEach((item) => {
-      const option = document.createElement("option");
-      option.value = item.category;
-      option.textContent = `${item.category} (${item.count})`;
-      select.appendChild(option);
-    });
-  } catch (error) {
-    //manteniamo il frontend utilizzabile anche senza categorie
-    console.error(error);
-  }
-}
-
-//carica la sezione prodotti popolari
-async function loadPopularProducts() {
-  try {
-    const products = await fetchRecommendations(12);
-    renderProducts("popularGrid", products);
-  } catch (error) {
-    renderMessage("popularGrid", "Raccomandazioni non disponibili.");
-  }
-}
-
-//Carica i profili demo usati dal recommender
-//Il backend restituisce un utente caldo ibrido e un cold start popularity
-//Il profilo selezionato viene salvato in localStorage per restare coerente tra pagine
-async function loadRecommendationProfiles() {
-  try {
-    state.recommendationProfiles = await fetchJson("/recommendation-profiles");
-  } catch (error) {
-    state.recommendationProfiles = [];
-  }
-  setupRecommendationProfileSelect();
-}
-
-//Popola la select del profilo demo quando presente nella pagina
-//Se manca una scelta salvata,usa il primo profilo restituito dal backend
-//Al cambio profilo ricarica solo la sezione raccomandazioni
-function setupRecommendationProfileSelect() {
-  const select = document.getElementById("recommendationProfileSelect");
-  if (!select) {
+async function runDiscoverySearch() {
+  const input = document.getElementById("searchInput");
+  const query = input.value.trim();
+  if (!query) {
+    renderDiscoveryEmpty("Scrivi una query, anche semplice come mouse.");
     return;
   }
-  select.innerHTML = "";
-  state.recommendationProfiles.forEach((profile) => {
-    const option = document.createElement("option");
-    option.value = profile.profile_id;
-    option.textContent = profile.label;
-    select.appendChild(option);
-  });
 
-  const selectedProfileId = getSelectedRecommendationProfileId();
-  if (selectedProfileId) {
-    select.value = selectedProfileId;
-  }
-
-  select.addEventListener("change", () => {
-    localStorage.setItem(RECOMMENDATION_PROFILE_STORAGE_KEY, select.value);
-    updateRecommendationProfileInfo();
-    if (document.body.dataset.page === "catalog") {
-      loadPopularProducts();
-    }
-    if (document.body.dataset.page === "product") {
-      loadRecommendations();
-    }
-  });
-  updateRecommendationProfileInfo();
-}
-
-//Restituisce il profilo demo selezionato
-//Controlla prima localStorage,poi fallback sul primo profilo disponibile
-//Se il backend non risponde,usa l'id del profilo ibrido previsto
-function getSelectedRecommendationProfileId() {
-  const savedProfileId = localStorage.getItem(RECOMMENDATION_PROFILE_STORAGE_KEY);
-  const validIds = new Set(state.recommendationProfiles.map((profile) => profile.profile_id));
-  if (savedProfileId && validIds.has(savedProfileId)) {
-    return savedProfileId;
-  }
-  return state.recommendationProfiles[0]?.profile_id || "demo_hybrid";
-}
-
-//Aggiorna descrizione del modello sotto il titolo Consigliati
-//Serve a rendere chiaro se stiamo usando HybridGrid o MostPopular
-//La descrizione arriva direttamente dal backend
-function updateRecommendationProfileInfo() {
-  const info = document.getElementById("recommendationModelInfo");
-  if (!info) {
-    return;
-  }
-  const profileId = getSelectedRecommendationProfileId();
-  const profile = state.recommendationProfiles.find((item) => item.profile_id === profileId);
-  if (!profile) {
-    info.textContent = "HybridGrid demo";
-    return;
-  }
-  info.textContent = `${profile.model} - ${profile.description}`;
-}
-
-//Chiama l'endpoint raccomandazioni usando il profilo demo corrente
-//Default backend: profilo caldo HybridGrid_SVD4_010_Content_035_Pop_055
-//Profilo cold start: popularity baseline
-async function fetchRecommendations(limit) {
-  const profileId = getSelectedRecommendationProfileId();
-  const params = new URLSearchParams({
-    profile_id: profileId,
-    limit: String(limit),
-  });
-  return fetchJson(`/recommendations?${params.toString()}`);
-}
-
-//Esegue ricerca testuale con eventuale filtro categoria
-//Se il clustering e attivo chiama endpoint cluster,altrimenti ricerca locale o AI
-//Dopo ogni ricerca resetta filtri prezzo per allinearli ai nuovi risultati
-async function runSearch() {
-  const resultsSection = document.getElementById("catalogResultsSection");
-  if (resultsSection) {
-    resultsSection.classList.remove("hidden");
-  }
   setSearchLoading(true);
-  document.getElementById("resultsCount").textContent = "Caricamento...";
-  renderMessage("resultsGrid", "Caricamento risultati...");
-
-  const query = document.getElementById("searchInput").value.trim();
-  const question = document.getElementById("aiQuestionInput").value.trim();
-  const category = document.getElementById("categorySelect").value;
-  const clusteringEnabled = document.getElementById("clusterSearchCheckbox").checked;
-  const params = new URLSearchParams({ q: query, limit: "500" }); //costruisce query string sicura
-  //aggiungiamo categoria solo se selezionata
-  if (category) {
-    params.set("category", category);
-  }
-
+  renderDiscoveryLoading(query);
   try {
-    state.aiSearch = null; //cancella avviso AI precedente
-    state.clusteredSearch = null; //cancella cluster precedente
-    let products = [];
-    if (clusteringEnabled) {
-      state.clusteredSearch = await runClusteredSearch(query, category);
-      products = flattenClusterProducts(state.clusteredSearch); //serve per riusare filtri prezzo/rating
-    } else {
-      products = question
-        ? await runAiSearch(query, question, category)
-        : await fetchJson(`/search?${params.toString()}`);
-    }
-    state.currentProducts = products;
-    state.priceFilterActive = false;
-    updatePriceControls(products); //ricalcola min/max slider sui nuovi risultati
-    applyCatalogFilters();
-    scrollResultsIntoView();
+    const response = await postJson("/discover", {
+      query,
+      limit: 80,
+      use_ai_support: true,
+    });
+    state.discovery = response;
+    renderDiscovery(response);
   } catch (error) {
-    renderMessage("resultsGrid", "Ricerca non disponibile.");
+    console.error(error);
+    renderDiscoveryEmpty("Ricerca discovery non disponibile.");
   } finally {
     setSearchLoading(false);
   }
 }
 
-//Mostra all'utente che Applica ha avviato davvero una nuova ricerca
-//Questo e utile soprattutto quando il clustering parte senza query testuale
 function setSearchLoading(isLoading) {
   const button = document.getElementById("searchButton");
   if (!button) {
     return;
   }
   button.disabled = isLoading;
-  button.textContent = isLoading ? "Caricamento..." : "Applica";
+  button.textContent = isLoading ? "Analisi..." : "Analizza";
 }
 
-//Dopo una ricerca porta in vista i risultati, evitando l'impressione che non sia successo nulla
-function scrollResultsIntoView() {
-  const section = document.getElementById("catalogResultsSection");
-  if (!section) {
-    return;
-  }
-  section.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-//Usa Gemini solo quando l'utente ha scritto una domanda/esigenza
-//Il backend prova AI ma puo rispondere fallback locale
-//Se anche la POST fallisce,torniamo alla ricerca GET semplice
-async function runAiSearch(query, question, category) {
-  try {
-    const response = await postJson("/ai-search", {
-      query,
-      question,
-      category: category || null,
-      limit: 30,
-    });
-    state.aiSearch = {
-      answer: response.answer,
-      fallback: Boolean(response.fallback), //normalizza valore per classi CSS/avviso
-    };
-    return response.results || [];
-  } catch (error) {
-    console.error(error);
-    state.aiSearch = {
-      answer: "Ricerca AI non disponibile, mostrati risultati locali.",
-      fallback: true,
-    };
-    const params = new URLSearchParams({ q: query, limit: "500" }); //fallback locale con stessi filtri base
-    if (category) {
-      params.set("category", category);
-    }
-    return fetchJson(`/search?${params.toString()}`);
-  }
-}
-
-//richiede al backend cluster calcolati sui risultati della ricerca locale
-async function runClusteredSearch(query, category) {
-  return postJson("/search/clustered", {
-    query,
-    category: category || null,
-    limit: 500,
-    use_ai_labels: false, //mantiene il clustering della UI rapido; il backend supporta ancora Gemini se richiesto
-  });
-}
-
-//Appiattiamo solo per riusare filtri prezzo/rating gia presenti nel frontend
-//I cluster originali restano in state.clusteredSearch
-//Quando renderizziamo,ricostruiamo i cluster filtrando solo prodotti visibili
-function flattenClusterProducts(clusteredSearch) {
-  const clusters = clusteredSearch.clusters || [];
-  return clusters.flatMap((cluster) => cluster.products || []);
-}
-
-//Applica filtri e ordinamento lato frontend
-//Lavora sempre su una copia per non alterare state.currentProducts
-//Se c'e ordine AI e sort e popularity_desc,conserviamo l'ordine suggerito
-function applyCatalogFilters() {
-  let products = [...state.currentProducts];
-  const minRating = Number(document.getElementById("minRatingSelect").value || 0);
-  const minReviews = Number(document.getElementById("minReviewsInput").value || 0);
-
-  if (state.priceFilterActive) {
-    const minPrice = Number(document.getElementById("minPriceInput").value || 0);
-    const maxPrice = Number(document.getElementById("maxPriceInput").value || 0);
-    products = products.filter((product) => {
-      const price = normalizePrice(product.price); //normalizza prima di confrontare range
-      return price !== null && price >= minPrice && price <= maxPrice;
-    });
-  }
-
-  if (minRating > 0) {
-    products = products.filter((product) => Number(product.average_rating || 0) >= minRating);
-  }
-
-  if (minReviews > 0) {
-    products = products.filter((product) => Number(product.rating_count || 0) >= minReviews);
-  }
-
-  const sortMode = document.getElementById("sortSelect").value;
-  if (!hasAiOrder(products) || sortMode !== "popularity_desc") { //non sovrascrive ranking AI di default
-    products = sortProducts(products, sortMode);
-  }
-  renderAiSearchNotice();
-  if (state.clusteredSearch) {
-    const clusters = filterAndSortClusters(state.clusteredSearch.clusters || [], products, sortMode);
-    renderClusters("resultsGrid", clusters);
-  } else {
-    renderProducts("resultsGrid", products);
-  }
-  setResultsCount(products.length, state.currentProducts.length);
-}
-
-//Applica filtri e ordinamento ai prodotti interni a ogni cluster
-//Usa visibleIds per mantenere solo i prodotti sopravvissuti ai filtri
-//Elimina cluster diventati vuoti dopo filtri prezzo/rating
-function filterAndSortClusters(clusters, visibleProducts, sortMode) {
-  const visibleIds = new Set(visibleProducts.map((product) => product.item_id)); //lookup veloce per id visibili
-  return clusters
-    .map((cluster) => {
-      const products = (cluster.products || []).filter((product) => visibleIds.has(product.item_id));
-      return {
-        ...cluster,
-        products: sortProducts(products, sortMode),
-      };
-    })
-    .filter((cluster) => cluster.products.length > 0);
-}
-
-//riconosce risultati gia ordinati da Gemini
-function hasAiOrder(products) {
-  return products.some((product) => product.ai_score !== null && product.ai_score !== undefined);
-}
-
-//Ordina i prodotti secondo la scelta utente
-//Crea una copia per non mutare l'array ricevuto
-//I prezzi mancanti sono gestiti da priceForSort
-function sortProducts(products, sortMode) {
-  const ordered = [...products];
-  if (sortMode === "price_asc") {
-    return ordered.sort((a, b) => priceForSort(a.price, false) - priceForSort(b.price, false));
-  }
-  if (sortMode === "price_desc") {
-    return ordered.sort((a, b) => priceForSort(b.price, true) - priceForSort(a.price, true));
-  }
-  if (sortMode === "rating_desc") {
-    return ordered.sort((a, b) => Number(b.average_rating || 0) - Number(a.average_rating || 0));
-  }
-  if (sortMode === "reviews_desc") {
-    return ordered.sort((a, b) => Number(b.rating_count || 0) - Number(a.rating_count || 0));
-  }
-  return ordered.sort((a, b) => Number(b.popularity_score || 0) - Number(a.popularity_score || 0));
-}
-
-//normalizza prezzi mancanti o non numerici
-function normalizePrice(value) {
-  const price = Number(value);
-  return Number.isFinite(price) && price > 0 ? price : null;
-}
-
-//mantiene i prodotti senza prezzo in fondo all'ordinamento
-function priceForSort(value, desc) {
-  const price = normalizePrice(value);
-  if (price === null) {
-    return desc ? -1 : Number.MAX_SAFE_INTEGER;
-  }
-  return price;
-}
-
-//Aggiorna slider prezzo in base ai prodotti caricati
-//Usa solo prezzi validi,cosi prodotti senza prezzo non falsano il range
-//Se non ci sono prezzi,disabilita i controlli
-function updatePriceControls(products) {
-  const minPriceInput = document.getElementById("minPriceInput");
-  const maxPriceInput = document.getElementById("maxPriceInput");
-  const prices = products.map((product) => normalizePrice(product.price)).filter((price) => price !== null); //scarta null prima di min/max
-
-  if (!prices.length) {
-    minPriceInput.disabled = true;
-    maxPriceInput.disabled = true;
-    minPriceInput.value = "0";
-    maxPriceInput.value = "0";
-    updatePriceLabel(null, null);
-    return;
-  }
-
-  const minPrice = Math.floor(Math.min(...prices));
-  const maxPrice = Math.ceil(Math.max(...prices));
-  [minPriceInput, maxPriceInput].forEach((input) => { //sincronizza attributi comuni dei due slider
-    input.disabled = false;
-    input.min = String(minPrice);
-    input.max = String(maxPrice);
-    input.step = "1";
-  });
-  minPriceInput.value = String(minPrice);
-  maxPriceInput.value = String(maxPrice);
-  updatePriceLabel(minPrice, maxPrice);
-}
-
-//Sincronizza i due slider del prezzo
-//Impedisce che il minimo superi il massimo o viceversa
-//Attiva il filtro prezzo solo dopo interazione utente
-function syncPriceRange(changedInput) {
-  const minPriceInput = document.getElementById("minPriceInput");
-  const maxPriceInput = document.getElementById("maxPriceInput");
-  let minPrice = Number(minPriceInput.value);
-  let maxPrice = Number(maxPriceInput.value);
-
-  if (minPrice > maxPrice && changedInput === "min") {
-    maxPrice = minPrice;
-    maxPriceInput.value = String(maxPrice);
-  }
-  if (maxPrice < minPrice && changedInput === "max") {
-    minPrice = maxPrice;
-    minPriceInput.value = String(minPrice);
-  }
-
-  state.priceFilterActive = true;
-  updatePriceLabel(minPrice, maxPrice);
-}
-
-//aggiorna etichetta del range prezzo
-function updatePriceLabel(minPrice, maxPrice) {
-  const label = document.getElementById("priceRangeLabel");
-  if (minPrice === null || maxPrice === null) {
-    label.textContent = "N/D";
-    return;
-  }
-  label.textContent = `${formatPrice(minPrice)} - ${formatPrice(maxPrice)}`;
-}
-
-//riporta i filtri al valore iniziale
-function resetFilters() {
-  document.getElementById("searchInput").value = "";
-  document.getElementById("aiQuestionInput").value = "";
-  document.getElementById("categorySelect").value = "";
-  document.getElementById("clusterSearchCheckbox").checked = false;
-  document.getElementById("sortSelect").value = "popularity_desc";
-  document.getElementById("minRatingSelect").value = "0";
-  document.getElementById("minReviewsInput").value = "";
-  runSearch();
-}
-
-//carica e renderizza il dettaglio prodotto
-async function loadProductDetail(itemId) {
-  try {
-    const product = await fetchJson(`/products/${encodeURIComponent(itemId)}`);
-    renderProductDetail(product);
-  } catch (error) {
-    renderMessage("productDetail", "Prodotto non trovato.");
-    disableProductQa();
-  }
-}
-
-//carica raccomandazioni usando i prodotti popolari
-async function loadRecommendations() {
-  try {
-    const products = await fetchRecommendations(8);
-    renderProducts("recommendationsGrid", products);
-  } catch (error) {
-    renderMessage("recommendationsGrid", "Consigli non disponibili.");
-  }
-}
-
-//collega la form QA al prodotto corrente
-function setupProductQa(itemId) {
-  const form = document.getElementById("qaForm");
-  if (!form) {
-    return;
-  }
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    askProductQuestion(itemId);
-  });
-}
-
-function disableProductQa() {
-  const section = document.querySelector(".qa-section");
-  if (section) {
-    section.classList.add("hidden");
-  }
-}
-
-//Invia una domanda grounded al backend
-//Il backend recupera evidenze solo per il prodotto corrente
-//finally spegne sempre lo stato loading,anche in caso di errore
-async function askProductQuestion(itemId) {
-  const input = document.getElementById("qaQuestionInput");
-  const question = input.value.trim();
-  if (!question) {
-    renderQaError("Scrivi una domanda sul prodotto.");
-    return;
-  }
-
-  setQaLoading(true);
-  try {
-    const response = await postJson(`/products/${encodeURIComponent(itemId)}/qa`, {
-      question,
-      use_ai: true,
-    });
-    renderProductQaResponse(response);
-  } catch (error) {
-    console.error(error);
-    renderQaError("Risposta QA non disponibile.");
-  } finally {
-    setQaLoading(false);
-  }
-}
-
-function setQaLoading(isLoading) {
-  const button = document.getElementById("qaSubmitButton");
-  if (!button) {
-    return;
-  }
-  button.disabled = isLoading;
-  button.textContent = isLoading ? "Caricamento..." : "Chiedi";
-}
-
-//Mostra risposta ed evidenze usate dal backend
-//La confidence controlla il colore del box risposta
-//Tutti i testi dinamici passano da escapeHtml prima di entrare nell'HTML
-function renderProductQaResponse(response) {
-  const answerBox = document.getElementById("qaAnswer");
-  const evidenceBox = document.getElementById("qaEvidence");
-  const confidence = ["low", "medium", "high"].includes(response.confidence) //valida classe CSS attesa
-    ? response.confidence
-    : "low";
-  answerBox.className = `qa-answer confidence-${confidence}`;
-  answerBox.innerHTML = `
-    <strong>Risposta</strong>
-    <p>${escapeHtml(response.answer || "")}</p>
+function renderDiscoveryLoading(query) {
+  const summary = document.getElementById("discoverySummary");
+  summary.className = "discovery-summary";
+  summary.innerHTML = `
+    <strong>Analisi in corso</strong>
+    <p>Sto cercando ruoli e motivazioni locali per "${escapeHtml(query)}".</p>
   `;
+  renderMessage("roleResults", "Caricamento gruppi prodotto...");
+}
 
-  const evidence = response.evidence || [];
-  evidenceBox.className = "qa-evidence";
-  if (!evidence.length) {
-    evidenceBox.innerHTML = "<p>Nessuna evidenza specifica recuperata.</p>";
-    return;
+function renderDiscoveryEmpty(message) {
+  const summary = document.getElementById("discoverySummary");
+  summary.className = "discovery-summary hidden";
+  summary.innerHTML = "";
+  renderMessage("roleResults", message);
+}
+
+function renderDiscovery(response) {
+  renderDiscoverySummary(response);
+  renderRoleGroups(response.groups || []);
+  const results = document.getElementById("roleResults");
+  if (results) {
+    results.scrollIntoView({ behavior: "smooth", block: "start" });
   }
+}
 
-  evidenceBox.innerHTML = `
-    <h3>Evidenze usate</h3>
-    <div class="evidence-list">
-      ${evidence.map((item) => ` //template sicuro perche i campi testuali sono escapati
-        <article class="evidence-item">
-          <div class="evidence-meta">
-            <span>${escapeHtml(item.source)}</span>
-            <span>score ${Number(item.score || 0).toFixed(2)}</span>
-          </div>
-          <p>${escapeHtml(item.text)}</p>
-        </article>
-      `).join("")}
+function renderDiscoverySummary(response) {
+  const summary = document.getElementById("discoverySummary");
+  const sourceSummary = response.source_summary || {};
+  const sourceChips = Object.entries(sourceSummary)
+    .map(([label, count]) => `<span>${escapeHtml(label)} ${Number(count || 0)}</span>`)
+    .join("");
+  summary.className = "discovery-summary";
+  summary.innerHTML = `
+    <div>
+      <strong>${response.used_ai_support ? "Discovery assistita" : "Discovery locale"}</strong>
+      <p>${escapeHtml(response.answer || "")}</p>
     </div>
+    <div class="source-summary">${sourceChips}</div>
   `;
 }
 
-function renderQaError(message) {
-  const answerBox = document.getElementById("qaAnswer");
-  const evidenceBox = document.getElementById("qaEvidence");
-  answerBox.className = "qa-answer confidence-low";
-  answerBox.innerHTML = `<strong>Avviso</strong><p>${escapeHtml(message)}</p>`;
-  evidenceBox.className = "qa-evidence hidden";
-  evidenceBox.innerHTML = "";
-}
-
-//renderizza una lista di prodotti in una griglia
-function renderProducts(containerId, products) {
-  const container = document.getElementById(containerId);
-  if (containerId === "resultsGrid") {
-    container.className = "product-grid";
-  }
+function renderRoleGroups(groups) {
+  const container = document.getElementById("roleResults");
+  container.className = "role-results";
   container.innerHTML = "";
 
-  //stato vuoto
-  if (!products.length) {
-    renderMessage(containerId, "Nessun prodotto trovato.");
+  if (!groups.length) {
+    renderMessage("roleResults", "Nessun gruppo prodotto trovato.");
     return;
   }
 
-  //creiamo una card per ogni prodotto
-  products.forEach((product) => {
-    container.appendChild(createProductCard(product));
-  });
-}
-
-//Renderizza sezioni cluster con card prodotto cliccabili
-//Ogni cluster ha heading,keyword e una griglia di card
-//Le label possono arrivare da AI,quindi vengono sempre escapate
-function renderClusters(containerId, clusters) {
-  const container = document.getElementById(containerId);
-  container.className = "cluster-results";
-  container.innerHTML = "";
-
-  if (!clusters.length) {
-    renderMessage(containerId, "Nessun prodotto trovato.");
-    return;
-  }
-
-  clusters.forEach((cluster) => {
+  groups.forEach((group) => {
     const section = document.createElement("section");
-    section.className = "cluster-section";
+    section.className = `role-section role-${escapeHtml(group.role_id || "generic")}`;
 
     const heading = document.createElement("div");
-    heading.className = "cluster-heading";
+    heading.className = "role-heading";
     heading.innerHTML = `
       <div>
-        <h3>${escapeHtml(cluster.label)}</h3>
-        <p>${escapeHtml(cluster.description || "")}</p>
+        <p class="role-kicker">${escapeHtml(roleKicker(group.role_id))}</p>
+        <h2>${escapeHtml(group.label)}</h2>
+        <p>${escapeHtml(group.description || "")}</p>
       </div>
-      <span class="cluster-size">${cluster.products.length} prodotti</span>
+      <span class="role-size">${formatProductCount(group.size)}</span>
     `;
 
     const keywords = document.createElement("div");
     keywords.className = "cluster-keywords";
-    (cluster.keywords || []).slice(0, 6).forEach((keyword) => { //limita chip per non appesantire UI
+    (group.keywords || []).slice(0, 6).forEach((keyword) => {
       const chip = document.createElement("span");
       chip.textContent = keyword;
       keywords.appendChild(chip);
     });
 
     const grid = document.createElement("div");
-    grid.className = "product-grid cluster-grid";
-    cluster.products.forEach((product) => {
-      grid.appendChild(createProductCard(product));
+    grid.className = "product-grid role-grid";
+    (group.products || []).forEach((product) => {
+      grid.appendChild(createProductCard(product, { showEvidence: true }));
     });
 
     section.appendChild(heading);
+    if (group.reason) {
+      const reason = document.createElement("p");
+      reason.className = "role-reason";
+      reason.textContent = group.reason;
+      section.appendChild(reason);
+    }
     if (keywords.children.length) {
       section.appendChild(keywords);
     }
@@ -709,55 +215,37 @@ function renderClusters(containerId, clusters) {
   });
 }
 
-//mostra risposta AI oppure stato della ricerca clusterizzata sopra la griglia risultati
-function renderAiSearchNotice() {
-  const notice = document.getElementById("aiSearchNotice");
-  if (!notice) {
-    return;
-  }
-  if (state.aiSearch) {
-    const title = state.aiSearch.fallback ? "Avviso" : "Risposta AI";
-    notice.className = state.aiSearch.fallback
-      ? "ai-search-notice fallback"
-      : "ai-search-notice";
-    notice.innerHTML = `
-      <strong>${escapeHtml(title)}</strong>
-      <p>${escapeHtml(state.aiSearch.answer || "")}</p>
-    `;
-    return;
-  }
-
-  if (state.clusteredSearch) {
-    const clusterCount = Number((state.clusteredSearch.clusters || []).length);
-    const totalResults = Number(state.clusteredSearch.total_results || 0);
-    const labelSource = state.clusteredSearch.used_ai_labels
-      ? "etichette generate con Gemini"
-      : "etichette locali";
-    const message = state.clusteredSearch.clustered
-      ? `${clusterCount} cluster creati sui ${totalResults} risultati con ${labelSource}.`
-      : `Risultati mostrati in un unico gruppo con ${labelSource}.`;
-    notice.className = "ai-search-notice";
-    notice.innerHTML = `
-      <strong>Risultati raggruppati</strong>
-      <p>${escapeHtml(message)}</p>
-    `;
-    return;
-  }
-
-  notice.classList.add("hidden");
-  notice.innerHTML = "";
+function roleKicker(roleId) {
+  const labels = {
+    best_choice: "Priorita",
+    budget: "Prezzo",
+    balanced: "Compromesso",
+    same_brand: "Marca",
+    complementary: "Uso insieme",
+    popular_alternatives: "Popolarita",
+  };
+  return labels[roleId] || "Ruolo";
 }
 
-//Crea una card prodotto riutilizzabile
-//Usa DOM API per struttura principale e escapeHtml per testo dinamico
-//Il click naviga alla pagina dettaglio passando item_id in query string
-function createProductCard(product) {
+function formatProductCount(value) {
+  const count = Number(value || 0);
+  return `${count} ${count === 1 ? "prodotto" : "prodotti"}`;
+}
+
+async function loadProductDetail(itemId) {
+  try {
+    const product = await fetchJson(`/products/${encodeURIComponent(itemId)}`);
+    renderProductDetail(product);
+  } catch (error) {
+    renderMessage("productDetail", "Prodotto non trovato.");
+  }
+}
+
+function createProductCard(product, options = {}) {
   const card = document.createElement("article");
   card.className = "product-card";
 
   const imageBox = createImageBox(product, "product-image");
-
-  //corpo card con metadati principali
   const body = document.createElement("div");
   body.className = "card-body";
   body.innerHTML = `
@@ -770,20 +258,23 @@ function createProductCard(product) {
     </div>
   `;
 
-  if (product.ai_reason) {
+  if (product.role_reason) {
     const reason = document.createElement("p");
     reason.className = "ai-reason";
-    reason.innerHTML = `<strong>Perche consigliato:</strong> ${escapeHtml(product.ai_reason)}`;
+    reason.innerHTML = `<strong>Perche qui:</strong> ${escapeHtml(product.role_reason)}`;
     body.appendChild(reason);
   }
 
-  //bottone verso pagina dettaglio
+  if (options.showEvidence) {
+    body.appendChild(createEvidenceBlock(product));
+  }
+
   const button = document.createElement("button");
   button.className = "secondary-button";
   button.type = "button";
   button.textContent = "Dettagli";
   button.addEventListener("click", () => {
-    window.location.href = `product.html?id=${encodeURIComponent(product.item_id)}`;
+    window.location.href = `product.html?id=${encodeURIComponent(product.item_id)}&v=mission-cleanup-1`;
   });
 
   body.appendChild(button);
@@ -792,13 +283,36 @@ function createProductCard(product) {
   return card;
 }
 
-//renderizza la pagina dettaglio prodotto
+function createEvidenceBlock(product) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "evidence-preview";
+
+  const sources = document.createElement("div");
+  sources.className = "source-chips";
+  (product.evidence_sources || ["metadati"]).forEach((source) => {
+    const chip = document.createElement("span");
+    chip.textContent = source;
+    sources.appendChild(chip);
+  });
+
+  const list = document.createElement("div");
+  list.className = "evidence-snippets";
+  (product.evidence || []).slice(0, 2).forEach((item) => {
+    const snippet = document.createElement("p");
+    snippet.innerHTML = `<strong>${escapeHtml(item.source_label || item.source)}:</strong> ${escapeHtml(item.text || "")}`;
+    list.appendChild(snippet);
+  });
+
+  wrapper.appendChild(sources);
+  wrapper.appendChild(list);
+  return wrapper;
+}
+
 function renderProductDetail(product) {
   const container = document.getElementById("productDetail");
   container.innerHTML = "";
 
   const imageBox = createImageBox(product, "detail-image");
-  //informazioni testuali e statistiche del prodotto
   const info = document.createElement("div");
   info.className = "detail-info";
   info.innerHTML = `
@@ -817,23 +331,19 @@ function renderProductDetail(product) {
   container.appendChild(info);
 }
 
-//crea box immagine con fallback
 function createImageBox(product, className) {
   const wrapper = document.createElement("div");
   wrapper.className = className;
 
-  //nessun URL immagine
   if (!product.image_url) {
     wrapper.appendChild(createPlaceholder());
     return wrapper;
   }
 
-  //immagine prodotto remota
   const image = document.createElement("img");
   image.src = product.image_url;
   image.alt = product.title;
   image.loading = "lazy";
-  //fallback se il caricamento immagine fallisce
   image.addEventListener("error", () => {
     wrapper.innerHTML = "";
     wrapper.appendChild(createPlaceholder());
@@ -842,7 +352,6 @@ function createImageBox(product, className) {
   return wrapper;
 }
 
-//placeholder grafico quando manca l'immagine
 function createPlaceholder() {
   const placeholder = document.createElement("div");
   placeholder.className = "image-placeholder";
@@ -850,28 +359,21 @@ function createPlaceholder() {
   return placeholder;
 }
 
-//mostra messaggi vuoti o errori in una sezione
 function renderMessage(containerId, message) {
   const container = document.getElementById(containerId);
   container.innerHTML = `<p class="empty-state">${escapeHtml(message)}</p>`;
 }
 
-//aggiorna il contatore dei risultati
-function setResultsCount(count, total) {
-  if (total && total !== count) {
-    document.getElementById("resultsCount").textContent = `${count} di ${total} prodotti`;
-    return;
-  }
-  document.getElementById("resultsCount").textContent = `${count} prodotti`;
+function normalizePrice(value) {
+  const price = Number(value);
+  return Number.isFinite(price) && price > 0 ? price : null;
 }
 
-//formatta il rating medio
 function formatRating(value) {
   const number = Number(value || 0);
   return number > 0 ? number.toFixed(1) : "N/D";
 }
 
-//formatta il prezzo prodotto
 function formatPrice(value) {
   const price = normalizePrice(value);
   if (price === null) {
@@ -883,14 +385,10 @@ function formatPrice(value) {
   });
 }
 
-//classe CSS diversa quando manca il prezzo
 function priceClassName(value) {
   return normalizePrice(value) === null ? "price-row muted-price" : "price-row";
 }
 
-//Escapa testo prima di inserirlo in HTML
-//Serve per evitare che titoli/descrizioni del dataset vengano interpretati come markup
-//Va usato ogni volta che una stringa dinamica entra in innerHTML
 function escapeHtml(value) {
   return String(value || "")
     .replaceAll("&", "&amp;")

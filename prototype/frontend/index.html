@@ -3,115 +3,50 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Product Discovery Prototype</title>
-    <link rel="stylesheet" href="style.css?v=hybrid-demo-2">
+    <title>AI Product Discovery</title>
+    <link rel="stylesheet" href="style.css?v=mission-cleanup-1">
   </head>
   <body data-page="catalog">
     <!--intestazione principale del prototipo-->
     <header class="site-header">
       <div class="header-main">
         <div>
-          <h1>Product Discovery Prototype</h1>
-          <p class="intro">Catalogo demo Amazon-like con ricerca,filtri e consigli HybridGrid.</p>
+          <h1>AI Product Discovery</h1>
+          <p class="intro">Ricerca prodotti full AI-first con ruoli, motivazioni ed evidenze locali.</p>
         </div>
-        <label class="field compact-field profile-field header-profile-field">
-          <span>Profilo demo</span>
-          <select id="recommendationProfileSelect"></select>
-        </label>
       </div>
     </header>
 
-    <!--contenuto principale della home catalogo-->
+    <!--esperienza principale di ricerca a query unica-->
     <main class="page-shell">
-      <div class="catalog-layout">
-        <!--filtri laterali del catalogo-->
-        <aside class="filter-panel" aria-label="Filtri catalogo">
-          <h2>Filtri</h2>
-          <label class="field">
-            <span>Ricerca</span>
-            <input id="searchInput" type="search" placeholder="Titolo, categoria o descrizione">
-          </label>
-          <label class="field">
-            <span>Domanda o esigenza opzionale</span>
-            <input id="aiQuestionInput" type="text" placeholder="Es. mi serve per studiare, deve essere economico e con buone recensioni">
-          </label>
-          <label class="field">
-            <span>Categoria</span>
-            <select id="categorySelect">
-              <option value="">Tutte le categorie</option>
-            </select>
-          </label>
-          <label class="check-field">
-            <input id="clusterSearchCheckbox" type="checkbox">
-            <span>Raggruppa risultati in cluster</span>
-          </label>
-          <label class="field">
-            <span>Ordina per</span>
-            <select id="sortSelect">
-              <option value="popularity_desc">Popolarità</option>
-              <option value="price_asc">Prezzo crescente</option>
-              <option value="price_desc">Prezzo decrescente</option>
-              <option value="rating_desc">Rating migliore</option>
-              <option value="reviews_desc">Più recensioni</option>
-            </select>
-          </label>
-          <div class="filter-group">
-            <div class="filter-title">
-              <span>Prezzo</span>
-              <span id="priceRangeLabel">N/D</span>
-            </div>
-            <label class="field compact-field">
-              <span>Da</span>
-              <input id="minPriceInput" type="range" min="0" max="0" value="0" disabled>
-            </label>
-            <label class="field compact-field">
-              <span>A</span>
-              <input id="maxPriceInput" type="range" min="0" max="0" value="0" disabled>
-            </label>
+      <section class="discovery-panel" aria-labelledby="discoveryTitle">
+        <div class="section-heading">
+          <div>
+            <h2 id="discoveryTitle">Cerca per prodotto, esigenza o missione</h2>
+            <p>Il sistema raggruppa i prodotti in ruoli usando catalogo, recensioni e QA locali.</p>
           </div>
-          <label class="field">
-            <span>Rating minimo</span>
-            <select id="minRatingSelect">
-              <option value="0">Qualsiasi rating</option>
-              <option value="4.5">Da 4.5 in su</option>
-              <option value="4">Da 4.0 in su</option>
-              <option value="3.5">Da 3.5 in su</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>Recensioni minime</span>
-            <input id="minReviewsInput" type="number" min="0" step="100" placeholder="Es. 1000">
-          </label>
-          <button id="searchButton" class="primary-button" type="button">Applica</button>
-          <button id="resetFiltersButton" class="light-button" type="button">Reset</button>
-        </aside>
-
-        <div class="results-area">
-          <!--griglia raccomandazioni hybrid/cold start-->
-          <section class="content-section first-section">
-            <div class="section-heading">
-              <div>
-                <h2>Consigliati</h2>
-                <p id="recommendationModelInfo">Caricamento profilo...</p>
-              </div>
-            </div>
-            <div id="popularGrid" class="product-grid compact-grid"></div>
-          </section>
-
-          <!--griglia risultati ricerca-->
-          <section id="catalogResultsSection" class="content-section hidden">
-            <div class="section-heading">
-              <h2>Risultati</h2>
-              <p id="resultsCount"></p>
-            </div>
-            <div id="aiSearchNotice" class="ai-search-notice hidden"></div>
-            <div id="resultsGrid" class="product-grid"></div>
-          </section>
         </div>
-      </div>
+        <form id="discoveryForm" class="discovery-form">
+          <label class="field discovery-query-field">
+            <span>Query</span>
+            <input id="searchInput" type="search" placeholder="Es. mouse, mouse gaming wireless, telefono economico con buona batteria">
+          </label>
+          <button id="searchButton" class="primary-button" type="submit">Analizza</button>
+        </form>
+        <div class="query-examples" aria-label="Esempi query">
+          <button class="example-chip" type="button" data-query="mouse gaming wireless">mouse gaming wireless</button>
+          <button class="example-chip" type="button" data-query="telefono economico batteria">telefono economico batteria</button>
+          <button class="example-chip" type="button" data-query="filtro acqua frigorifero">filtro acqua frigorifero</button>
+        </div>
+      </section>
+
+      <section id="discoverySummary" class="discovery-summary hidden" aria-live="polite"></section>
+      <section id="roleResults" class="role-results" aria-live="polite">
+        <p class="empty-state">Scrivi una query per generare gruppi come migliore scelta, economici, compromesso e prodotti complementari.</p>
+      </section>
     </main>
 
     <!--logica frontend vanilla JS-->
-    <script src="app.js?v=cluster-fix-2"></script>
+    <script src="app.js?v=mission-cleanup-1"></script>
   </body>
 </html>
