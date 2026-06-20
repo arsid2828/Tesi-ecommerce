@@ -17,10 +17,15 @@
   --extension-shadow-soft: 0 8px 18px rgba(24, 34, 45, 0.08);
 }
 
+.hidden {
+  display: none !important;
+}
+
 /*stile popup estensione*/
 body.extension-popup {
-  width: 380px;
-  min-height: 520px;
+  width: 430px;
+  min-height: 560px;
+  max-height: 680px;
   margin: 0;
   background:
     linear-gradient(180deg, #e9f1f3 0, var(--extension-bg) 170px),
@@ -28,6 +33,7 @@ body.extension-popup {
   color: var(--extension-text);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
   line-height: 1.45;
+  overflow-y: auto;
 }
 
 /*box model popup*/
@@ -47,6 +53,10 @@ body.extension-popup .popup-shell {
 body.extension-popup .popup-header {
   position: relative;
   overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   background: #182632;
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -91,6 +101,14 @@ body.extension-popup .popup-header h1 {
   letter-spacing: 0;
 }
 
+body.extension-popup .popup-header .status-pill {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  margin-top: 2px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
 /*sezione popup*/
 body.extension-popup .popup-section {
   display: grid;
@@ -111,10 +129,6 @@ body.extension-popup .popup-section:nth-of-type(1) {
 
 body.extension-popup .popup-section:nth-of-type(2) {
   animation-delay: 0.08s;
-}
-
-body.extension-popup .popup-section:nth-of-type(3) {
-  animation-delay: 0.12s;
 }
 
 /*hover sezioni*/
@@ -256,7 +270,7 @@ body.extension-popup .primary-button:focus-visible {
 /*risultato prodotto*/
 body.extension-popup .result-box {
   display: grid;
-  gap: 4px;
+  gap: 7px;
   margin: 0;
   padding: 10px;
   background:
@@ -268,9 +282,10 @@ body.extension-popup .result-box {
 /*titolo risultato*/
 body.extension-popup .result-box h2 {
   margin: 0;
-  font-size: 15px;
-  line-height: 1.3;
+  font-size: 14px;
+  line-height: 1.28;
   letter-spacing: 0;
+  overflow-wrap: anywhere;
 }
 
 /*testi risultato*/
@@ -282,8 +297,8 @@ body.extension-popup .result-box p {
 /*layout dettaglio prodotto nel popup*/
 body.extension-popup .popup-product-layout {
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
   align-items: start;
 }
 
@@ -298,8 +313,8 @@ body.extension-popup .popup-product-info {
 body.extension-popup .popup-product-image {
   display: grid;
   place-items: center;
-  width: 92px;
-  height: 92px;
+  width: 96px;
+  height: 96px;
   overflow: hidden;
   background: #fff;
   border: 1px solid var(--extension-line);
@@ -311,8 +326,8 @@ body.extension-popup .popup-product-image {
 body.extension-popup .recommendation-image {
   display: grid;
   place-items: center;
-  width: 58px;
-  height: 58px;
+  width: 66px;
+  height: 66px;
   overflow: hidden;
   background: #fff;
   border: 1px solid var(--extension-line);
@@ -322,7 +337,8 @@ body.extension-popup .recommendation-image {
 
 /*immagini prodotto nel popup*/
 body.extension-popup .popup-product-image img,
-body.extension-popup .recommendation-image img {
+body.extension-popup .recommendation-image img,
+body.extension-popup .recommendation-detail-image img {
   display: block;
   max-width: calc(100% - 8px);
   max-height: calc(100% - 8px);
@@ -332,18 +348,8 @@ body.extension-popup .recommendation-image img {
   transition: transform 0.18s ease;
 }
 
-/*fallback immagine popup*/
-body.extension-popup .image-placeholder {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 100%;
-  padding: 6px;
-  background: var(--extension-surface-soft);
-  color: var(--extension-muted);
-  font-size: 10px;
-  line-height: 1.2;
-  text-align: center;
+body.extension-popup .default-product-image {
+  opacity: 0.86;
 }
 
 /*categoria risultato*/
@@ -352,6 +358,13 @@ body.extension-popup .category-line {
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
+}
+
+body.extension-popup .product-id-line {
+  color: var(--extension-muted);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  overflow-wrap: anywhere;
 }
 
 /*testo errore*/
@@ -371,8 +384,8 @@ body.extension-popup .recommendations-list {
 /*gruppo raccomandazioni*/
 body.extension-popup .recommendation-group {
   display: grid;
-  gap: 8px;
-  padding: 9px;
+  gap: 9px;
+  padding: 10px;
   background: var(--extension-surface-soft);
   border: 1px solid var(--extension-line);
   border-radius: 6px;
@@ -389,7 +402,7 @@ body.extension-popup .recommendation-group-heading {
 body.extension-popup .recommendation-group-heading h3 {
   margin: 0;
   color: var(--extension-text);
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 0;
 }
 
@@ -409,24 +422,25 @@ body.extension-popup .recommendation-group-heading span {
 body.extension-popup .recommendation-group > p {
   margin: 0;
   color: var(--extension-muted);
-  font-size: 12px;
+  font-size: 12.5px;
+  line-height: 1.4;
 }
 
 /*lista prodotti dentro il gruppo*/
 body.extension-popup .recommendation-products {
   display: grid;
-  gap: 7px;
+  gap: 8px;
 }
 
 /*raccomandazione con miniatura*/
 body.extension-popup .recommendation-item {
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: 66px minmax(0, 1fr);
+  gap: 10px;
   align-items: center;
   width: 100%;
-  min-height: 74px;
-  padding: 7px;
+  min-height: 92px;
+  padding: 9px;
   background: #ffffff;
   border: 1px solid var(--extension-line);
   border-radius: 6px;
@@ -464,13 +478,13 @@ body.extension-popup .recommendation-body {
 /*titolo raccomandazione*/
 body.extension-popup .recommendation-body span {
   color: var(--extension-text);
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.25;
+  font-size: 13.5px;
+  font-weight: 800;
+  line-height: 1.28;
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
 }
 
 /*metadati raccomandazione*/
@@ -478,13 +492,111 @@ body.extension-popup .recommendation-body small,
 body.extension-popup .empty-list-item {
   color: var(--extension-muted);
   font-size: 12px;
+  line-height: 1.35;
 }
 
 body.extension-popup .recommendation-reason {
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
+}
+
+body.extension-popup .recommendation-action {
+  color: var(--extension-accent-dark) !important;
+  font-weight: 800;
+}
+
+body.extension-popup .recommendation-detail {
+  display: grid;
+  gap: 10px;
+  padding: 11px;
+  background: #ffffff;
+  border: 1px solid var(--extension-accent);
+  border-radius: 8px;
+  box-shadow: var(--extension-shadow-soft);
+}
+
+body.extension-popup .recommendation-detail-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+body.extension-popup .recommendation-detail-heading p {
+  margin: 0;
+  color: var(--extension-accent-dark);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+body.extension-popup .icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  color: var(--extension-muted);
+  background: var(--extension-surface-soft);
+  border: 1px solid var(--extension-line);
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+body.extension-popup .recommendation-detail-layout {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+body.extension-popup .recommendation-detail-image {
+  display: grid;
+  place-items: center;
+  width: 104px;
+  height: 104px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--extension-line);
+  border-radius: 6px;
+}
+
+body.extension-popup .recommendation-detail-body {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+body.extension-popup .recommendation-detail-body h3 {
+  margin: 0;
+  color: var(--extension-text);
+  font-size: 15px;
+  line-height: 1.3;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+body.extension-popup .recommendation-detail-meta,
+body.extension-popup .recommendation-detail-reason {
+  margin: 0;
+  color: var(--extension-muted);
+  font-size: 12.5px;
+  line-height: 1.42;
+}
+
+body.extension-popup .recommendation-detail-reason {
+  color: #31444f;
+}
+
+body.extension-popup .open-product-button {
+  min-height: 36px;
+  width: 100%;
+  margin-top: 2px;
 }
 
 body.extension-popup .empty-list-item {

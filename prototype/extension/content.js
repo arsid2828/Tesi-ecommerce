@@ -316,7 +316,7 @@ function readAmazonCandidatePrice(container) {
   }
 
   const text = cleanText(container && container.textContent);
-  const match = text.match(/(?:€|\$|£)\s?\d+(?:[.,]\d{2})?/);
+  const match = text.match(/(?:\u20ac|\$|\u00a3)\s?\d+(?:[.,]\d{2})?/u);
   return match ? match[0] : null;
 }
 
@@ -348,7 +348,7 @@ function readAmazonSectionLabel(element) {
 
 function inferAmazonSourceRole(label, title, sourceTitle) {
   const text = `${label || ""} ${title || ""}`.toLowerCase();
-  if (/(insieme|acquistati|bought|together|bundle|frequently|accessor)/i.test(text)) {
+  if (/(insieme|acquistati|bought|together|bundle|frequently|accessor|protezione|protection|garanzia|warranty|danni accidentali)/i.test(text)) {
     return "together";
   }
   if (/(simil|similar|compare|confront|related|confronta)/i.test(text)) {
@@ -383,7 +383,10 @@ function isUsefulAmazonTitle(value) {
   if (text.length < 12 || text.length > 220) {
     return false;
   }
-  if (!/[a-zA-ZÀ-ÿ]/.test(text)) {
+  if (!/[a-zA-Z]/.test(text)) {
+    return false;
+  }
+  if (/click to learn more|sponsored product|carta amazon business|amazon business amex|business american express|passa a amazon business/i.test(text)) {
     return false;
   }
   return !/^(vedi|see|details|shop|visit|clicca|immagine|image)$/i.test(text);
@@ -408,7 +411,7 @@ function tokenOverlap(left, right) {
 function tokenize(value) {
   return cleanText(value)
     .toLowerCase()
-    .match(/[a-z0-9à-ÿ][a-z0-9à-ÿ-]{2,}/g) || [];
+    .match(/[a-z0-9][a-z0-9-]{2,}/g) || [];
 }
 
 function absoluteUrl(value) {

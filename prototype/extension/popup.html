@@ -14,23 +14,19 @@
   <main class="popup-shell">
     <!--intestazione compatta del popup-->
     <header class="popup-header">
-      <p class="popup-kicker">Prototipo tesi</p>
-      <h1>Tesi E-commerce Demo</h1>
-    </header>
-
-    <!--stato backend e URL della tab attiva-->
-    <section class="popup-section">
+      <div>
+        <p class="popup-kicker">Prototipo tesi</p>
+        <h1>Tesi E-commerce Demo</h1>
+      </div>
       <div id="backendStatus" class="status-pill status-muted">Controllo backend...</div>
-      <p class="label">Tab corrente</p>
-      <p id="currentUrl" class="url-value">URL non disponibile</p>
-    </section>
+    </header>
 
     <!--riconoscimento prodotto locale o Amazon-->
     <section class="popup-section">
       <p class="label">Pagina prodotto</p>
       <p id="productPageStatus" class="muted-text">Verifica URL in corso...</p>
-      <p id="itemIdValue" class="item-id-value">item_id non rilevato</p>
-      <button id="loadProductButton" class="primary-button" type="button" disabled>Carica prodotto</button>
+      <p id="itemIdValue" class="item-id-value hidden">item_id non rilevato</p>
+      <button id="loadProductButton" class="primary-button hidden" type="button" disabled>Carica prodotto</button>
       <div id="productResult" class="result-box muted-text">Nessun prodotto caricato.</div>
     </section>
 
@@ -41,6 +37,7 @@
         <span id="recommendationsStatus" class="small-muted">Caricamento...</span>
       </div>
       <div id="recommendationsList" class="recommendations-list"></div>
+      <div id="recommendationDetail" class="recommendation-detail hidden"></div>
     </section>
   </main>
 </body>

@@ -161,11 +161,11 @@ def _build_local_groups(
         _local_group(
             source=source,
             role_id="similar",
-            label="Prodotti simili",
-            description="Prodotti del catalogo locale con contenuto, categoria o segnali di qualita vicini al prodotto aperto.",
+            label="Migliori prodotti simili",
+            description="Prodotti vicini al prodotto aperto, selezionati per somiglianza, prezzo, qualita e popolarita locale.",
             candidates=similar,
             evidence_service=evidence_service,
-            reason="Selezione calcolata localmente da titolo, descrizione, categoria, rating e popolarita.",
+            reason="Scelti dal catalogo locale confrontando titolo, descrizione, categoria, prezzo, rating e popolarita.",
         )
     )
 
@@ -183,11 +183,11 @@ def _build_local_groups(
         _local_group(
             source=source,
             role_id="alternatives",
-            label="Scelte alternative",
-            description="Alternative confrontabili prese dal dataset locale, utili se vuoi cambiare marca, prezzo o compromesso.",
+            label="Alternative valide",
+            description="Alternative confrontabili dal dataset locale, utili se vuoi cambiare marca, prezzo o compromesso.",
             candidates=alternatives,
             evidence_service=evidence_service,
-            reason="Le alternative restano nel catalogo locale e privilegiano diversita, qualita e prezzo vicino.",
+            reason="Selezione locale orientata a diversita di marca, prezzo vicino e qualita complessiva.",
         )
     )
 
@@ -197,8 +197,8 @@ def _build_local_groups(
         _local_group(
             source=source,
             role_id="together",
-            label="Da acquistare assieme",
-            description="Prodotti complementari che possono affiancare quello aperto, sempre scelti dal dataset del sito.",
+            label="Complementari e utili assieme",
+            description="Prodotti che possono affiancare quello aperto: accessori, ricambi o articoli di supporto dal dataset locale.",
             candidates=together,
             evidence_service=evidence_service,
             reason="Il ruolo usa parole chiave di accessori o ricambi quando presenti; altrimenti applica un fallback locale su categoria, qualita e diversita.",
@@ -272,21 +272,24 @@ def _local_product_reason(
     group_reason: str,
     evidence: list[DiscoveryEvidence],
 ) -> str:
+    product=candidate.product
     sources=", ".join(_unique_source_labels(evidence)) or "metadati"
     if role_id == "similar":
+        category_text="stessa categoria" if candidate.category_score else "categoria diversa ma contenuto vicino"
         return (
-            f"{group_reason} Similarita contenuto {candidate.text_score:.2f}; "
-            f"categoria {'uguale' if candidate.category_score else 'diversa'}; fonti: {sources}."
+            f"Simile per {category_text}, prezzo {_format_price(product.price)} e rating {_format_rating(product.average_rating)}. "
+            f"Marca stimata: {candidate.brand or 'non chiara'}. Fonti locali: {sources}."
         )
     if role_id == "alternatives":
+        brand_text=f"marca diversa ({candidate.brand})" if candidate.brand else "marca non chiara"
         return (
-            f"{group_reason} Prezzo vicino {candidate.price_affinity:.2f}, "
-            f"qualita locale {candidate.quality_score:.2f}; fonti: {sources}."
+            f"Alternativa con {brand_text}, prezzo {_format_price(product.price)} e qualita locale basata su rating, recensioni e popolarita. "
+            f"Fonti: {sources}."
         )
     if role_id == "together":
         return (
-            f"{group_reason} Complementarita locale {candidate.bundle_score:.2f}; "
-            f"non sostituisce {source.title}, lo affianca."
+            f"Utile assieme al prodotto aperto: puo fare da accessorio, ricambio o supporto d'uso. "
+            f"Prezzo {_format_price(product.price)}, rating {_format_rating(product.average_rating)}."
         )
     return f"{group_reason} Fonti: {sources}."
 
@@ -556,6 +559,8 @@ def _normalize_amazon_candidates(
         product_url=_safe_url(raw.product_url)
         if not title or not product_url:
             continue
+        if not _is_relevant_amazon_candidate(title):
+            continue
         asin=_normalize_asin(raw.asin) or _asin_from_url(product_url)
         dedupe_key=asin or product_url
         if not dedupe_key or dedupe_key in seen or asin == source_asin:
@@ -592,20 +597,20 @@ def _build_amazon_groups(
     role_defs=[
         (
             "similar",
-            "Prodotti simili su Amazon",
-            "Prodotti reali letti dalla pagina Amazon e collegati a sezioni di confronto o similarita.",
+            "Prodotti simili migliori",
+            "Alternative reali lette nella pagina Amazon e vicine al prodotto aperto.",
             "similar",
         ),
         (
             "alternatives",
-            "Alternative reali",
+            "Altre alternative reali",
             "Altri prodotti Amazon disponibili tra i suggerimenti visibili nella pagina.",
             "alternative",
         ),
         (
             "together",
-            "Spesso acquistati insieme",
-            "Prodotti reali estratti da sezioni Amazon orientate ad acquisto congiunto o accessori.",
+            "Complementari e spesso assieme",
+            "Accessori, servizi o prodotti reali collegati all'acquisto principale.",
             "together",
         ),
     ]
@@ -752,8 +757,8 @@ def _merge_amazon_ai_response(
 
 
 def _infer_amazon_role(source: AmazonPageProduct,candidate: AmazonRecommendationCandidate) -> str:
-    hint=f"{candidate.source_role or ''} {candidate.source_label or ''}".lower()
-    if any(token in hint for token in ["together","bought","bundle","frequently","acquistati","insieme","accessori"]):
+    hint=f"{candidate.source_role or ''} {candidate.source_label or ''} {candidate.title or ''}".lower()
+    if any(token in hint for token in ["together","bought","bundle","frequently","acquistati","insieme","accessori","protezione","protection","garanzia","warranty","danni accidentali"]):
         return "together"
     if any(token in hint for token in ["similar","compare","confronta","simili","related"]):
         return "similar"
@@ -784,10 +789,23 @@ def _amazon_candidate_score(source: AmazonPageProduct,title: str,role: str) -> f
 def _amazon_product_reason(role: str,source_label: str | None,score: float) -> str:
     origin=source_label or "sezione visibile nella pagina Amazon"
     if role == "together":
-        return f"Candidato reale letto da {origin}; possibile acquisto insieme, score pagina {score:.2f}."
+        return f"Complementare reale trovato in {origin}: puo essere utile insieme al prodotto principale o come servizio/accessorio di supporto."
     if role == "similar":
-        return f"Candidato reale letto da {origin}; vicino al prodotto aperto, score pagina {score:.2f}."
-    return f"Candidato reale letto da {origin}; alternativa disponibile tra i suggerimenti visibili."
+        return f"Prodotto reale trovato in {origin}: simile al prodotto aperto per titolo, sezione o parole chiave condivise."
+    return f"Alternativa reale trovata in {origin}: utile per confrontare un'altra opzione disponibile nella pagina."
+
+
+def _is_relevant_amazon_candidate(title: str) -> bool:
+    clean=_normalize(title)
+    blocked=[
+        "click to learn more",
+        "sponsored product",
+        "carta amazon business",
+        "amazon business amex",
+        "business american express",
+        "passa a amazon business",
+    ]
+    return not any(term in clean for term in blocked)
 
 
 def _looks_complementary(source_text: str,candidate_text: str) -> bool:

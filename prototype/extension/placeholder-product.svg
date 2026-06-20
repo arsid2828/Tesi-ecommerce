@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" role="img" aria-label="Placeholder prodotto">
+  <rect width="160" height="160" rx="18" fill="#f7f9fb"/>
+  <rect x="32" y="46" width="96" height="72" rx="10" fill="#ffffff" stroke="#c7d0db" stroke-width="4"/>
+  <path d="M46 104l20-22 16 16 12-13 20 19" fill="none" stroke="#0b7a75" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="104" cy="66" r="9" fill="#f2b84b"/>
+  <path d="M42 126h76" stroke="#667381" stroke-width="7" stroke-linecap="round" opacity="0.45"/>
+</svg>

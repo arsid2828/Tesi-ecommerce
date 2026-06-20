@@ -1,5 +1,6 @@
 const BACKEND_URL = "http://localhost:8000";
 const LOCAL_PRODUCT_URL = "http://localhost:3000/product.html";
+const DEFAULT_PRODUCT_IMAGE_URL = "placeholder-product.svg";
 
 //Stato minimo del popup
 //itemId vale per il prototipo locale,amazonProduct per Amazon reale
@@ -17,8 +18,10 @@ async function initPopup() {
   popupState.activeTab = tab;
   const currentUrl = tab && tab.url ? tab.url : "";
 
-  setText("currentUrl", currentUrl || "URL non disponibile");
-  document.getElementById("loadProductButton").addEventListener("click", loadCurrentProduct);
+  const loadButton = document.getElementById("loadProductButton");
+  if (loadButton) {
+    loadButton.addEventListener("click", loadCurrentProduct);
+  }
 
   await updateProductPageState(tab, currentUrl);
   await Promise.all([checkBackendStatus(), loadRecommendations()]);
@@ -36,16 +39,23 @@ async function updateProductPageState(tab, currentUrl) {
   const detection = await detectActiveProduct(tab, currentUrl);
   const product = detection.product;
   const button = document.getElementById("loadProductButton");
+  const idValue = document.getElementById("itemIdValue");
 
   popupState.itemId = null;
   popupState.amazonProduct = null;
   popupState.amazonCandidates = detection.amazonCandidates || [];
-  button.textContent = "Carica prodotto";
+  if (button) {
+    button.hidden = true;
+    button.disabled = true;
+    button.textContent = "Carica prodotto";
+  }
+  if (idValue) {
+    idValue.hidden = true;
+  }
+  hideRecommendationDetail();
 
   if (!product) {
     setText("productPageStatus", "Non sei su una pagina prodotto riconosciuta.");
-    setText("itemIdValue", "item_id/ASIN non rilevato");
-    button.disabled = true;
     setResultText("Apri una pagina prodotto locale o Amazon.");
     return;
   }
@@ -53,18 +63,13 @@ async function updateProductPageState(tab, currentUrl) {
   if (product.kind === "amazon") {
     popupState.amazonProduct = product;
     setText("productPageStatus", "Prodotto Amazon rilevato.");
-    setText("itemIdValue", `ASIN: ${product.asin}`);
-    button.textContent = "Amazon rilevato";
-    button.disabled = true;
     renderAmazonProduct(product);
     return;
   }
 
   popupState.itemId = product.itemId;
   setText("productPageStatus", "Pagina prodotto locale rilevata.");
-  setText("itemIdValue", product.itemId);
-  button.disabled = false;
-  setResultText("Nessun prodotto caricato.");
+  await loadCurrentProduct();
 }
 
 async function detectActiveProduct(tab, currentUrl) {
@@ -201,8 +206,13 @@ function renderProduct(product) {
   const reviews = document.createElement("p");
   reviews.textContent = `Recensioni: ${Number(product.rating_count || 0).toLocaleString("it-IT")}`;
 
+  const itemId = document.createElement("p");
+  itemId.className = "product-id-line";
+  itemId.textContent = `item_id: ${product.item_id}`;
+
   info.appendChild(category);
   info.appendChild(title);
+  info.appendChild(itemId);
   info.appendChild(rating);
   info.appendChild(reviews);
   layout.appendChild(imageBox);
@@ -234,6 +244,7 @@ function renderAmazonProduct(product) {
   title.textContent = product.title || "Titolo non disponibile";
 
   const asin = document.createElement("p");
+  asin.className = "product-id-line";
   asin.textContent = `ASIN: ${product.asin}`;
 
   const note = document.createElement("p");
@@ -331,8 +342,10 @@ async function loadPopularRecommendations() {
 function renderRecommendationGroups(groups, kind) {
   const list = document.getElementById("recommendationsList");
   list.innerHTML = "";
+  hideRecommendationDetail();
+  const displayGroups = normalizeRecommendationGroups(groups, kind);
 
-  if (!groups.length) {
+  if (!displayGroups.length) {
     const item = document.createElement("div");
     item.className = "empty-list-item";
     item.textContent = kind === "amazon"
@@ -342,7 +355,7 @@ function renderRecommendationGroups(groups, kind) {
     return;
   }
 
-  groups.slice(0, 3).forEach((group) => {
+  displayGroups.forEach((group) => {
     const section = document.createElement("section");
     section.className = `recommendation-group recommendation-group-${group.role_id || "generic"}`;
 
@@ -376,13 +389,61 @@ function renderRecommendationGroups(groups, kind) {
   });
 }
 
+function normalizeRecommendationGroups(groups, kind) {
+  const safeGroups = Array.isArray(groups) ? groups : [];
+  const similarProducts = [];
+  const complementaryProducts = [];
+  const seenSimilar = new Set();
+  const seenComplementary = new Set();
+
+  safeGroups.forEach((group) => {
+    const roleId = group.role_id || "";
+    const products = Array.isArray(group.products) ? group.products : [];
+    const isComplementary = roleId === "together" || roleId === "complementary";
+    const target = isComplementary ? complementaryProducts : similarProducts;
+    const seen = isComplementary ? seenComplementary : seenSimilar;
+    products.forEach((product) => {
+      const key = product.item_id || product.asin || product.product_url || product.title;
+      if (!key || seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      target.push(product);
+    });
+  });
+
+  const displayGroups = [];
+  if (similarProducts.length) {
+    displayGroups.push({
+      role_id: "best_similar",
+      label: kind === "amazon" ? "Prodotti simili migliori" : "Migliori prodotti simili",
+      description: kind === "amazon"
+        ? "Alternative reali trovate nella pagina, scelte per somiglianza con il prodotto aperto."
+        : "Scelte vicine per categoria, prezzo, qualita locale, popolarita e possibile affidabilita della marca.",
+      products: similarProducts.slice(0, 4),
+    });
+  }
+  if (complementaryProducts.length) {
+    displayGroups.push({
+      role_id: "complementary",
+      label: "Complementari e utili assieme",
+      description: kind === "amazon"
+        ? "Accessori, servizi o prodotti reali letti nella pagina e collegati all'acquisto principale."
+        : "Prodotti da usare insieme, accessori o alternative di supporto scelte dal catalogo locale.",
+      products: complementaryProducts.slice(0, 4),
+    });
+  }
+  return displayGroups;
+}
+
 function createRecommendationButton(product, kind) {
   const button = document.createElement("button");
   button.className = "recommendation-item";
   button.type = "button";
   button.addEventListener("click", () => {
-    openRecommendationUrl(recommendationUrl(product, kind));
+    renderRecommendationDetail(product, kind);
   });
+  button.setAttribute("aria-label", `Apri dettagli per ${product.title || "prodotto consigliato"}`);
 
   const imageBox = createProductImage(productImageAdapter(product, kind), "recommendation-image");
   const body = document.createElement("div");
@@ -391,20 +452,96 @@ function createRecommendationButton(product, kind) {
   const title = document.createElement("span");
   const meta = document.createElement("small");
   const reason = document.createElement("small");
+  const action = document.createElement("small");
 
   title.textContent = product.title || "Prodotto senza titolo";
   meta.textContent = recommendationMeta(product, kind);
   reason.className = "recommendation-reason";
-  reason.textContent = product.role_reason || "";
+  reason.textContent = shortReason(product.role_reason || recommendationFallbackReason(product, kind));
+  action.className = "recommendation-action";
+  action.textContent = "Apri dettagli";
 
   body.appendChild(title);
   body.appendChild(meta);
   if (reason.textContent) {
     body.appendChild(reason);
   }
+  body.appendChild(action);
   button.appendChild(imageBox);
   button.appendChild(body);
   return button;
+}
+
+function renderRecommendationDetail(product, kind) {
+  const detail = document.getElementById("recommendationDetail");
+  if (!detail) {
+    openRecommendationUrl(recommendationUrl(product, kind));
+    return;
+  }
+
+  detail.innerHTML = "";
+  detail.className = "recommendation-detail";
+
+  const header = document.createElement("div");
+  header.className = "recommendation-detail-heading";
+
+  const eyebrow = document.createElement("p");
+  eyebrow.textContent = kind === "amazon" ? "Prodotto Amazon reale" : "Prodotto del catalogo locale";
+
+  const closeButton = document.createElement("button");
+  closeButton.type = "button";
+  closeButton.className = "icon-button";
+  closeButton.textContent = "x";
+  closeButton.setAttribute("aria-label", "Chiudi dettaglio");
+  closeButton.addEventListener("click", hideRecommendationDetail);
+
+  header.appendChild(eyebrow);
+  header.appendChild(closeButton);
+
+  const layout = document.createElement("div");
+  layout.className = "recommendation-detail-layout";
+  layout.appendChild(createProductImage(productImageAdapter(product, kind), "recommendation-detail-image"));
+
+  const body = document.createElement("div");
+  body.className = "recommendation-detail-body";
+
+  const title = document.createElement("h3");
+  title.textContent = product.title || "Prodotto senza titolo";
+
+  const meta = document.createElement("p");
+  meta.className = "recommendation-detail-meta";
+  meta.textContent = recommendationMeta(product, kind);
+
+  const reason = document.createElement("p");
+  reason.className = "recommendation-detail-reason";
+  reason.textContent = product.role_reason || recommendationFallbackReason(product, kind);
+
+  const openButton = document.createElement("button");
+  openButton.type = "button";
+  openButton.className = "primary-button open-product-button";
+  openButton.textContent = "Apri pagina prodotto";
+  openButton.addEventListener("click", () => {
+    openRecommendationUrl(recommendationUrl(product, kind));
+  });
+
+  body.appendChild(title);
+  body.appendChild(meta);
+  body.appendChild(reason);
+  body.appendChild(openButton);
+  layout.appendChild(body);
+
+  detail.appendChild(header);
+  detail.appendChild(layout);
+  detail.scrollIntoView({ block: "nearest" });
+}
+
+function hideRecommendationDetail() {
+  const detail = document.getElementById("recommendationDetail");
+  if (!detail) {
+    return;
+  }
+  detail.innerHTML = "";
+  detail.className = "recommendation-detail hidden";
 }
 
 function productImageAdapter(product, kind) {
@@ -480,29 +617,23 @@ function createProductImage(product, className) {
   const wrapper = document.createElement("div");
   wrapper.className = className;
 
-  if (!product.image_url) {
-    wrapper.appendChild(createImagePlaceholder());
-    return wrapper;
-  }
-
   const image = document.createElement("img");
-  image.src = product.image_url;
+  image.src = product.image_url || DEFAULT_PRODUCT_IMAGE_URL;
   image.alt = product.title || "Immagine prodotto";
   image.loading = "lazy";
   image.addEventListener("error", () => {
-    wrapper.innerHTML = "";
-    wrapper.appendChild(createImagePlaceholder());
+    if (image.src.endsWith(DEFAULT_PRODUCT_IMAGE_URL)) {
+      return;
+    }
+    image.src = DEFAULT_PRODUCT_IMAGE_URL;
+    image.className = "default-product-image";
   });
+  if (!product.image_url) {
+    image.className = "default-product-image";
+  }
 
   wrapper.appendChild(image);
   return wrapper;
-}
-
-function createImagePlaceholder() {
-  const placeholder = document.createElement("div");
-  placeholder.className = "image-placeholder";
-  placeholder.textContent = "Immagine non disponibile";
-  return placeholder;
 }
 
 function formatRating(value) {
@@ -522,11 +653,29 @@ function formatPrice(value) {
 }
 
 function setText(elementId, value) {
-  document.getElementById(elementId).textContent = value;
+  const element = document.getElementById(elementId);
+  if (element) {
+    element.textContent = value;
+  }
 }
 
 function setResultText(value) {
   const result = document.getElementById("productResult");
   result.textContent = value;
   result.className = "result-box muted-text";
+}
+
+function shortReason(value) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (text.length <= 150) {
+    return text;
+  }
+  return `${text.slice(0, 147).trim()}...`;
+}
+
+function recommendationFallbackReason(product, kind) {
+  if (kind === "amazon") {
+    return `Prodotto reale rilevato nella pagina Amazon, dalla sezione ${product.source_label || "suggerimenti"}.`;
+  }
+  return "Consiglio scelto dal catalogo locale usando segnali di somiglianza, prezzo, qualita e popolarita.";
 }
