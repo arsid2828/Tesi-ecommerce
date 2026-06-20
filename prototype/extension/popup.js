@@ -1,20 +1,20 @@
 const BACKEND_URL = "http://localhost:8000";
+const LOCAL_PRODUCT_URL = "http://localhost:3000/product.html";
 
 //Stato minimo del popup
 //itemId vale per il prototipo locale,amazonProduct per Amazon reale
-//I due casi sono separati per non chiamare il backend su pagine Amazon
 const popupState = {
+  activeTab: null,
   itemId: null,
   amazonProduct: null,
+  amazonCandidates: [],
 };
 
 document.addEventListener("DOMContentLoaded", initPopup);
 
-//Inizializza popup,tab attiva e dati demo
-//Prima capisce dove si trova la tab corrente,poi controlla backend e raccomandazioni
-//Le chiamate indipendenti partono in parallelo per rendere il popup piu rapido
 async function initPopup() {
   const tab = await getActiveTab();
+  popupState.activeTab = tab;
   const currentUrl = tab && tab.url ? tab.url : "";
 
   setText("currentUrl", currentUrl || "URL non disponibile");
@@ -24,9 +24,6 @@ async function initPopup() {
   await Promise.all([checkBackendStatus(), loadRecommendations()]);
 }
 
-//Legge la tab attiva usando API Chrome
-//Chrome API usa callback,quindi la incapsuliamo in Promise
-//Questo permette di usare await nel resto del codice
 function getActiveTab() {
   return new Promise((resolve) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -35,14 +32,14 @@ function getActiveTab() {
   });
 }
 
-//Controlla se la tab contiene una pagina prodotto locale o Amazon
-//Resetta sempre lo stato prima di applicare il nuovo rilevamento
-//Amazon resta in sola lettura:mostriamo dati ma non abilitiamo Carica prodotto
 async function updateProductPageState(tab, currentUrl) {
-  const product = await detectActiveProduct(tab, currentUrl);
+  const detection = await detectActiveProduct(tab, currentUrl);
+  const product = detection.product;
   const button = document.getElementById("loadProductButton");
+
   popupState.itemId = null;
   popupState.amazonProduct = null;
+  popupState.amazonCandidates = detection.amazonCandidates || [];
   button.textContent = "Carica prodotto";
 
   if (!product) {
@@ -57,8 +54,8 @@ async function updateProductPageState(tab, currentUrl) {
     popupState.amazonProduct = product;
     setText("productPageStatus", "Prodotto Amazon rilevato.");
     setText("itemIdValue", `ASIN: ${product.asin}`);
-    button.textContent = "Solo riconoscimento";
-    button.disabled = true; //per ora Amazon fa solo riconoscimento,non lookup backend
+    button.textContent = "Amazon rilevato";
+    button.disabled = true;
     renderAmazonProduct(product);
     return;
   }
@@ -70,50 +67,56 @@ async function updateProductPageState(tab, currentUrl) {
   setResultText("Nessun prodotto caricato.");
 }
 
-//Usa il detector URL e,quando possibile,integra i dati letti dal content script
-//Il popup puo leggere l'URL,ma solo il content script puo leggere titolo/immagine dal DOM pagina
-//Se content script non risponde,usiamo comunque il rilevamento da URL
 async function detectActiveProduct(tab, currentUrl) {
   const urlProduct = window.ThesisProductDetector.detectFromUrl(currentUrl);
-  const pageProduct = await requestDetectedProduct(tab);
+  const pageData = await requestDetectedProduct(tab);
+  const pageProduct = pageData.product;
 
   if (!pageProduct) {
-    return urlProduct;
-  }
-
-  if (!urlProduct || urlProduct.kind === pageProduct.kind) { //fonde URL e DOM solo se parlano dello stesso tipo pagina
     return {
-      ...urlProduct,
-      ...pageProduct,
+      product: urlProduct,
+      amazonCandidates: pageData.amazonCandidates || [],
     };
   }
 
-  return urlProduct;
+  if (!urlProduct || urlProduct.kind === pageProduct.kind) {
+    return {
+      product: {
+        ...urlProduct,
+        ...pageProduct,
+      },
+      amazonCandidates: pageData.amazonCandidates || [],
+    };
+  }
+
+  return {
+    product: urlProduct,
+    amazonCandidates: pageData.amazonCandidates || [],
+  };
 }
 
-//Richiede al content script i dati gia letti dalla pagina attiva
-//Il timeout evita popup bloccato su pagine dove il content script non gira
-//chrome.runtime.lastError e normale se la tab non e tra i match del manifest
 function requestDetectedProduct(tab) {
   return new Promise((resolve) => {
     if (!tab || typeof tab.id === "undefined" || !chrome.tabs || !chrome.tabs.sendMessage) {
-      resolve(null);
+      resolve({ product: null, amazonCandidates: [] });
       return;
     }
 
-    const timeoutId = setTimeout(() => resolve(null), 500); //fallback rapido se non arriva risposta
+    const timeoutId = setTimeout(() => resolve({ product: null, amazonCandidates: [] }), 700);
     chrome.tabs.sendMessage(tab.id, { type: "GET_DETECTED_PRODUCT" }, (response) => {
       clearTimeout(timeoutId);
-      if (chrome.runtime.lastError || !response || !response.product) {
-        resolve(null);
+      if (chrome.runtime.lastError || !response) {
+        resolve({ product: null, amazonCandidates: [] });
         return;
       }
-      resolve(response.product);
+      resolve({
+        product: response.product || null,
+        amazonCandidates: Array.isArray(response.amazonCandidates) ? response.amazonCandidates : [],
+      });
     });
   });
 }
 
-//wrapper GET per il backend locale
 async function fetchBackend(path) {
   const response = await fetch(`${BACKEND_URL}${path}`);
   if (!response.ok) {
@@ -122,7 +125,20 @@ async function fetchBackend(path) {
   return response.json();
 }
 
-//mostra lo stato del backend nel popup
+async function postBackend(path, body) {
+  const response = await fetch(`${BACKEND_URL}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(`Errore API: ${response.status}`);
+  }
+  return response.json();
+}
+
 async function checkBackendStatus() {
   const status = document.getElementById("backendStatus");
   try {
@@ -135,9 +151,6 @@ async function checkBackendStatus() {
   }
 }
 
-//Carica dettaglio prodotto quando disponibile un item_id
-//Per Amazon non chiama il backend:mostra solo il prodotto rilevato
-//Per locale usa /products/{item_id}
 async function loadCurrentProduct() {
   const result = document.getElementById("productResult");
   if (popupState.amazonProduct) {
@@ -158,12 +171,11 @@ async function loadCurrentProduct() {
     const product = await fetchBackend(`/products/${encodeURIComponent(popupState.itemId)}`);
     renderProduct(product);
   } catch (error) {
-    result.textContent = "Prodotto non disponibile. Controlla che il backend sia acceso.";
+    result.textContent = "Prodotto non disponibile. Controlla che il backend sia acceso e che il catalogo locale esista.";
     result.className = "result-box error-text";
   }
 }
 
-//renderizza dettaglio prodotto usando solo nodi DOM
 function renderProduct(product) {
   const result = document.getElementById("productResult");
   result.innerHTML = "";
@@ -198,9 +210,6 @@ function renderProduct(product) {
   result.appendChild(layout);
 }
 
-//Mostra il prodotto Amazon riconosciuto senza chiamare il backend
-//Usa lo stesso layout del prodotto locale per rendere la demo coerente
-//I campi arrivano dal detector,quindi possono essere incompleti
 function renderAmazonProduct(product) {
   const result = document.getElementById("productResult");
   result.innerHTML = "";
@@ -209,7 +218,7 @@ function renderAmazonProduct(product) {
   const layout = document.createElement("div");
   layout.className = "popup-product-layout";
 
-  const imageBox = createProductImage({ //adatta campi Amazon al formato atteso da createProductImage
+  const imageBox = createProductImage({
     image_url: product.imageUrl,
     title: product.title || product.asin,
   }, "popup-product-image");
@@ -229,7 +238,9 @@ function renderAmazonProduct(product) {
 
   const note = document.createElement("p");
   note.className = "muted-text";
-  note.textContent = "Riconoscimento prodotto attivo.";
+  note.textContent = popupState.amazonCandidates.length
+    ? `${popupState.amazonCandidates.length} candidati reali letti dalla pagina.`
+    : "Nessun candidato reale leggibile nella pagina corrente.";
 
   info.appendChild(source);
   info.appendChild(title);
@@ -240,70 +251,231 @@ function renderAmazonProduct(product) {
   result.appendChild(layout);
 }
 
-//carica raccomandazioni baseline con fallback su /popular
 async function loadRecommendations() {
+  if (popupState.itemId) {
+    await loadLocalRecommendations();
+    return;
+  }
+
+  if (popupState.amazonProduct) {
+    await loadAmazonRecommendations();
+    return;
+  }
+
+  await loadPopularRecommendations();
+}
+
+async function loadLocalRecommendations() {
   const status = document.getElementById("recommendationsStatus");
+  status.textContent = "Caricamento...";
   try {
-    const products = await fetchRecommendations();
-    renderRecommendations(products);
-    status.textContent = `${products.length} prodotti`;
+    const response = await fetchBackend(
+      `/recommendations/contextual/${encodeURIComponent(popupState.itemId)}?limit=4&use_ai_support=true`,
+    );
+    renderRecommendationGroups(response.groups || [], "local");
+    status.textContent = response.used_ai_support ? "Locali + Gemini" : "Locali";
   } catch (error) {
-    renderRecommendations([]);
+    renderRecommendationGroups([], "local");
     status.textContent = "Non disponibili";
   }
 }
 
-//Usa endpoint semantico,se non esiste usa /popular
-//Il primo path e pensato per future API recommendation
-//Il fallback mantiene compatibile il popup con il backend attuale
-async function fetchRecommendations() {
+async function loadAmazonRecommendations() {
+  const status = document.getElementById("recommendationsStatus");
+  if (!popupState.amazonCandidates.length) {
+    renderRecommendationGroups([], "amazon");
+    status.textContent = "Nessun candidato";
+    return;
+  }
+
+  status.textContent = "Organizzazione...";
   try {
-    return await fetchBackend("/recommendations/popular?limit=5");
+    const response = await postBackend("/amazon/recommendations", {
+      product: {
+        asin: popupState.amazonProduct.asin,
+        title: popupState.amazonProduct.title || "",
+        image_url: popupState.amazonProduct.imageUrl || null,
+        page_url: popupState.amazonProduct.pageUrl || null,
+      },
+      candidates: popupState.amazonCandidates,
+      limit: 4,
+      use_ai_support: true,
+    });
+    renderRecommendationGroups(response.groups || [], "amazon");
+    status.textContent = response.used_ai_support ? "Reali + Gemini" : "Reali";
   } catch (error) {
-    return fetchBackend("/popular?limit=5");
+    renderRecommendationGroups(buildAmazonFallbackGroups(popupState.amazonCandidates, 4), "amazon");
+    status.textContent = "Reali dalla pagina";
   }
 }
 
-//Renderizza lista raccomandazioni senza HTML non sicuro
-//Costruisce nodi DOM invece di concatenare HTML dinamico
-//Questo evita interpretazione accidentale dei testi prodotto come markup
-function renderRecommendations(products) {
+async function loadPopularRecommendations() {
+  const status = document.getElementById("recommendationsStatus");
+  try {
+    const products = await fetchBackend("/recommendations/popular?limit=5");
+    renderRecommendationGroups([
+      {
+        role_id: "popular",
+        label: "Popolari locali",
+        description: "Fallback dal catalogo locale.",
+        products,
+      },
+    ], "local");
+    status.textContent = `${products.length} prodotti`;
+  } catch (error) {
+    renderRecommendationGroups([], "local");
+    status.textContent = "Non disponibili";
+  }
+}
+
+function renderRecommendationGroups(groups, kind) {
   const list = document.getElementById("recommendationsList");
   list.innerHTML = "";
 
-  if (!products.length) {
-    const item = document.createElement("li");
+  if (!groups.length) {
+    const item = document.createElement("div");
     item.className = "empty-list-item";
-    item.textContent = "Raccomandazioni non disponibili.";
+    item.textContent = kind === "amazon"
+      ? "Nessun prodotto Amazon reale leggibile nella pagina corrente."
+      : "Raccomandazioni locali non disponibili.";
     list.appendChild(item);
     return;
   }
 
-  products.forEach((product) => {
-    const item = document.createElement("li");
-    item.className = "recommendation-item";
+  groups.slice(0, 3).forEach((group) => {
+    const section = document.createElement("section");
+    section.className = `recommendation-group recommendation-group-${group.role_id || "generic"}`;
 
-    const imageBox = createProductImage(product, "recommendation-image");
-    const body = document.createElement("div");
-    body.className = "recommendation-body";
+    const heading = document.createElement("div");
+    heading.className = "recommendation-group-heading";
 
-    const title = document.createElement("span");
-    const meta = document.createElement("small");
+    const title = document.createElement("h3");
+    title.textContent = group.label || "Consigli";
 
-    title.textContent = product.title || "Prodotto senza titolo";
-    meta.textContent = `${product.category || "Categoria N/D"} - rating ${formatRating(product.average_rating)}`;
+    const count = document.createElement("span");
+    count.textContent = `${(group.products || []).length}`;
 
-    body.appendChild(title);
-    body.appendChild(meta);
-    item.appendChild(imageBox);
-    item.appendChild(body);
-    list.appendChild(item);
+    const description = document.createElement("p");
+    description.textContent = group.description || "";
+
+    heading.appendChild(title);
+    heading.appendChild(count);
+    section.appendChild(heading);
+    if (description.textContent) {
+      section.appendChild(description);
+    }
+
+    const products = document.createElement("div");
+    products.className = "recommendation-products";
+    (group.products || []).slice(0, 4).forEach((product) => {
+      products.appendChild(createRecommendationButton(product, kind));
+    });
+
+    section.appendChild(products);
+    list.appendChild(section);
   });
 }
 
-//Crea immagine prodotto con fallback
-//Se manca image_url o fallisce il caricamento,mostra placeholder
-//La stessa funzione serve sia prodotti locali sia Amazon riconosciuto
+function createRecommendationButton(product, kind) {
+  const button = document.createElement("button");
+  button.className = "recommendation-item";
+  button.type = "button";
+  button.addEventListener("click", () => {
+    openRecommendationUrl(recommendationUrl(product, kind));
+  });
+
+  const imageBox = createProductImage(productImageAdapter(product, kind), "recommendation-image");
+  const body = document.createElement("div");
+  body.className = "recommendation-body";
+
+  const title = document.createElement("span");
+  const meta = document.createElement("small");
+  const reason = document.createElement("small");
+
+  title.textContent = product.title || "Prodotto senza titolo";
+  meta.textContent = recommendationMeta(product, kind);
+  reason.className = "recommendation-reason";
+  reason.textContent = product.role_reason || "";
+
+  body.appendChild(title);
+  body.appendChild(meta);
+  if (reason.textContent) {
+    body.appendChild(reason);
+  }
+  button.appendChild(imageBox);
+  button.appendChild(body);
+  return button;
+}
+
+function productImageAdapter(product, kind) {
+  if (kind === "amazon") {
+    return {
+      title: product.title,
+      image_url: product.image_url,
+    };
+  }
+  return product;
+}
+
+function recommendationMeta(product, kind) {
+  if (kind === "amazon") {
+    return [product.price, product.source_label].filter(Boolean).join(" - ") || "Amazon reale";
+  }
+  return [
+    product.category || "Categoria N/D",
+    formatPrice(product.price),
+    `rating ${formatRating(product.average_rating)}`,
+  ].filter(Boolean).join(" - ");
+}
+
+function recommendationUrl(product, kind) {
+  if (kind === "amazon") {
+    return product.product_url;
+  }
+  return product.page_url || `${LOCAL_PRODUCT_URL}?id=${encodeURIComponent(product.item_id)}`;
+}
+
+function openRecommendationUrl(url) {
+  if (!url) {
+    return;
+  }
+  if (chrome.tabs && popupState.activeTab && typeof popupState.activeTab.id !== "undefined") {
+    chrome.tabs.update(popupState.activeTab.id, { url });
+    window.close();
+    return;
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+function buildAmazonFallbackGroups(candidates, limit) {
+  const labels = {
+    similar: "Prodotti simili su Amazon",
+    alternatives: "Alternative reali",
+    together: "Spesso acquistati insieme",
+  };
+  const roleMap = {
+    similar: "similar",
+    alternatives: "alternative",
+    together: "together",
+  };
+  return Object.entries(labels)
+    .map(([roleId, label]) => {
+      const products = candidates
+        .filter((candidate) => candidate.source_role === roleMap[roleId])
+        .slice(0, limit)
+        .map((candidate) => ({
+          ...candidate,
+          role_reason: candidate.role_reason || `Prodotto reale letto da ${candidate.source_label || "Amazon"}.`,
+        }));
+      return {
+        role_id: roleId,
+        label,
+        products,
+      };
+    })
+    .filter((group) => group.products.length);
+}
+
 function createProductImage(product, className) {
   const wrapper = document.createElement("div");
   wrapper.className = className;
@@ -326,7 +498,6 @@ function createProductImage(product, className) {
   return wrapper;
 }
 
-//placeholder quando manca l'immagine
 function createImagePlaceholder() {
   const placeholder = document.createElement("div");
   placeholder.className = "image-placeholder";
@@ -334,18 +505,26 @@ function createImagePlaceholder() {
   return placeholder;
 }
 
-//formatta rating medio
 function formatRating(value) {
   const number = Number(value || 0);
   return number > 0 ? number.toFixed(1) : "N/D";
 }
 
-//assegna testo a un elemento
+function formatPrice(value) {
+  const price = Number(value);
+  if (!Number.isFinite(price) || price <= 0) {
+    return "";
+  }
+  return price.toLocaleString("it-IT", {
+    style: "currency",
+    currency: "USD",
+  });
+}
+
 function setText(elementId, value) {
   document.getElementById(elementId).textContent = value;
 }
 
-//assegna il testo al box risultato
 function setResultText(value) {
   const result = document.getElementById("productResult");
   result.textContent = value;

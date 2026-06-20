@@ -46,6 +46,12 @@ class DiscoveryProduct(Product):
     evidence: list[DiscoveryEvidence]=Field(default_factory=list)
 
 
+#Prodotto consigliato dall'estensione
+#page_url permette al popup di aprire direttamente la pagina locale del sito
+class RecommendationProduct(DiscoveryProduct):
+    page_url: str | None=None
+
+
 #Gruppo/cluster costruito per ruolo d'acquisto
 #I prodotti sono scelti localmente; Gemini puo solo aiutare con copy e label
 class DiscoveryRoleGroup(BaseModel):
@@ -65,6 +71,77 @@ class DiscoverySearchResponse(BaseModel):
     total_candidates: int
     groups: list[DiscoveryRoleGroup]
     source_summary: dict[str,int]=Field(default_factory=dict)
+    used_ai_support: bool=False
+    fallback: bool=False
+
+
+#Gruppo raccomandazioni contestuale per estensione
+#similar, alternative e bundle sono ruoli distinti ma sempre grounded sul catalogo locale
+class RecommendationGroup(BaseModel):
+    role_id: str
+    label: str
+    description: str
+    size: int
+    products: list[RecommendationProduct]
+    reason: str | None=None
+
+
+#Risposta raccomandazioni per una pagina prodotto locale
+class ContextualRecommendationsResponse(BaseModel):
+    item_id: str
+    source_product: Product
+    answer: str
+    groups: list[RecommendationGroup]
+    used_ai_support: bool=False
+    fallback: bool=False
+
+
+#Prodotto Amazon letto dalla pagina reale
+class AmazonPageProduct(BaseModel):
+    asin: str
+    title: str=""
+    image_url: str | None=None
+    page_url: str | None=None
+
+
+#Candidato Amazon reale estratto dalla pagina o da una sorgente esterna ufficiale
+class AmazonRecommendationCandidate(BaseModel):
+    asin: str | None=None
+    title: str
+    product_url: str
+    image_url: str | None=None
+    price: str | None=None
+    rating: str | None=None
+    source_label: str | None=None
+    source_role: str | None=None
+    role_reason: str=""
+    match_score: float=0.0
+
+
+#Gruppo di prodotti Amazon reali
+class AmazonRecommendationGroup(BaseModel):
+    role_id: str
+    label: str
+    description: str
+    size: int
+    products: list[AmazonRecommendationCandidate]
+    reason: str | None=None
+
+
+#Richiesta per organizzare candidati Amazon reali
+class AmazonRecommendationsRequest(BaseModel):
+    product: AmazonPageProduct
+    candidates: list[AmazonRecommendationCandidate]=Field(default_factory=list)
+    limit: int=Field(default=4,ge=1,le=8)
+    use_ai_support: bool=True
+
+
+#Risposta Amazon: non inventa prodotti,se non ci sono candidati reali lo dichiara
+class AmazonRecommendationsResponse(BaseModel):
+    asin: str
+    title: str=""
+    answer: str
+    groups: list[AmazonRecommendationGroup]
     used_ai_support: bool=False
     fallback: bool=False
 

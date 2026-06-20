@@ -30,7 +30,7 @@ COLUMN_ALIASES={
     ],
     "price": ["price","product_price"],
     "average_rating": ["average_rating","avg_rating","rating","stars"],
-    "rating_count": ["rating_count","review_count","ratings_count","count","num_ratings"],
+    "rating_count": ["rating_count","review_count","ratings_count","count","num_ratings","rating_number"],
     "image_url": ["image_url","image","main_image","images","large","hi_res"],
 }
 

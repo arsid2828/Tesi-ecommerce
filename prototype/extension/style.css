@@ -362,32 +362,84 @@ body.extension-popup .error-text {
 /*lista raccomandazioni*/
 body.extension-popup .recommendations-list {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-/*singola raccomandazione*/
-body.extension-popup .recommendations-list li {
+/*gruppo raccomandazioni*/
+body.extension-popup .recommendation-group {
   display: grid;
   gap: 8px;
   padding: 9px;
   background: var(--extension-surface-soft);
   border: 1px solid var(--extension-line);
   border-radius: 6px;
-  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+
+/*intestazione gruppo consigli*/
+body.extension-popup .recommendation-group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+body.extension-popup .recommendation-group-heading h3 {
+  margin: 0;
+  color: var(--extension-text);
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+body.extension-popup .recommendation-group-heading span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  color: var(--extension-accent-dark);
+  background: var(--extension-accent-soft);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+body.extension-popup .recommendation-group > p {
+  margin: 0;
+  color: var(--extension-muted);
+  font-size: 12px;
+}
+
+/*lista prodotti dentro il gruppo*/
+body.extension-popup .recommendation-products {
+  display: grid;
+  gap: 7px;
 }
 
 /*raccomandazione con miniatura*/
 body.extension-popup .recommendation-item {
+  display: grid;
   grid-template-columns: 58px minmax(0, 1fr);
+  gap: 8px;
   align-items: center;
+  width: 100%;
+  min-height: 74px;
+  padding: 7px;
+  background: #ffffff;
+  border: 1px solid var(--extension-line);
+  border-radius: 6px;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
 }
 
 /*hover raccomandazione*/
 body.extension-popup .recommendation-item:hover {
-  background: #ffffff;
+  background: #fbfcfd;
   border-color: #c7d0db;
   transform: translateX(2px);
 }
@@ -410,17 +462,36 @@ body.extension-popup .recommendation-body {
 }
 
 /*titolo raccomandazione*/
-body.extension-popup .recommendations-list span {
+body.extension-popup .recommendation-body span {
   color: var(--extension-text);
   font-size: 13px;
   font-weight: 700;
+  line-height: 1.25;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 /*metadati raccomandazione*/
-body.extension-popup .recommendations-list small,
+body.extension-popup .recommendation-body small,
 body.extension-popup .empty-list-item {
   color: var(--extension-muted);
   font-size: 12px;
+}
+
+body.extension-popup .recommendation-reason {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+body.extension-popup .empty-list-item {
+  padding: 10px;
+  background: var(--extension-surface-soft);
+  border: 1px dashed var(--extension-line);
+  border-radius: 6px;
 }
 
 /*box iniettato nella pagina prodotto*/
@@ -480,6 +551,93 @@ body.extension-popup .empty-list-item {
 .thesis-extension-box .thesis-extension-status {
   color: #095f5b;
   font-weight: 700;
+}
+
+/*area consigli nel box iniettato*/
+.thesis-extension-recommendations {
+  display: grid;
+  gap: 9px;
+  margin-top: 8px;
+  padding-top: 9px;
+  border-top: 1px solid #d9e0e8;
+}
+
+.thesis-extension-rec-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.thesis-extension-rec-heading strong {
+  color: #18222d;
+  font-size: 13px;
+}
+
+.thesis-extension-rec-status {
+  color: #667381;
+  font-size: 12px;
+}
+
+.thesis-extension-rec-group {
+  display: grid;
+  gap: 5px;
+}
+
+.thesis-extension-rec-title {
+  margin: 0;
+  color: #095f5b;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.thesis-extension-rec-list {
+  display: grid;
+  gap: 5px;
+}
+
+.thesis-extension-rec-link {
+  display: grid;
+  gap: 2px;
+  padding: 7px 8px;
+  color: #18222d;
+  background: #fff;
+  border: 1px solid #d9e0e8;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: border-color 0.16s ease, transform 0.16s ease, background 0.16s ease;
+}
+
+.thesis-extension-rec-link:hover {
+  background: #f7f9fb;
+  border-color: #0b7a75;
+  transform: translateX(2px);
+}
+
+.thesis-extension-rec-item-title {
+  color: #18222d !important;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.thesis-extension-rec-link small,
+.thesis-extension-empty {
+  color: #667381;
+  font-size: 12px;
+}
+
+.thesis-extension-empty {
+  margin: 0;
+  padding: 8px;
+  background: #f7f9fb;
+  border: 1px dashed #d9e0e8;
+  border-radius: 6px;
 }
 
 /*animazione ingresso popup*/
@@ -543,10 +701,11 @@ body.extension-popup .empty-list-item {
   }
 
   body.extension-popup .primary-button,
-  body.extension-popup .recommendations-list li,
+  body.extension-popup .recommendation-item,
   body.extension-popup .recommendation-image,
   body.extension-popup .popup-product-image img,
-  body.extension-popup .recommendation-image img {
+  body.extension-popup .recommendation-image img,
+  .thesis-extension-rec-link {
     transition: none;
   }
 }

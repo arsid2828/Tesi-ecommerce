@@ -56,6 +56,10 @@ Endpoint del sito:
 
 - `GET /health`
 - `GET /products/{item_id}`
+- `GET /popular`
+- `GET /recommendations/popular`
+- `GET /recommendations/contextual/{item_id}`
+- `POST /amazon/recommendations`
 - `POST /discover`
 
 ## Ricerca AI-first a ruoli
@@ -87,6 +91,17 @@ Il backend:
 - usa Gemini solo come supporto opzionale per rifinire copy e label, senza permettere all'AI di scegliere prodotti o inventare dati.
 
 Se Gemini non e disponibile, la risposta resta completamente locale.
+
+## Estensione e consigli contestuali
+
+L'estensione usa:
+
+- `GET /recommendations/contextual/{item_id}` sulle pagine prodotto locali;
+- `POST /amazon/recommendations` sulle pagine Amazon reali, passando solo candidati gia' letti dal DOM della pagina.
+
+Per il sito locale i prodotti consigliati sono sempre scelti dal dataset `products_demo.json`: simili, alternative e prodotti da acquistare assieme. Gemini puo solo rifinire testi e label dei gruppi gia' calcolati.
+
+Per Amazon reale il backend non cerca autonomamente sul web e non inventa prodotti. Organizza candidati reali estratti dalla pagina corrente; una ricerca Amazon esterna richiederebbe una API o un motore di ricerca collegato esplicitamente al backend.
 
 ## Evidenze locali
 
