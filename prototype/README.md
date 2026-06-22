@@ -2,8 +2,8 @@
 
 ## Obiettivo
 
-Prototipo web minimale per una tesi triennale su product discovery AI-first in e-commerce.
-La home usa una sola query testuale, raggruppa i prodotti per ruolo d'acquisto e spiega le scelte con evidenze locali da catalogo, recensioni e QA storiche.
+Prototipo web minimale per una tesi triennale sui recommender system e sulla product discovery in e-commerce.
+La home permette di confrontare due profili: un cold start servito soltanto dalla baseline Popular e un utente reale del dataset con 118 prodotti nello storico, servito dal miglior modello ibrido validato.
 
 Il progetto resta volutamente semplice: dati JSON/parquet locali, backend FastAPI, frontend statico HTML/CSS/JavaScript, nessun database e nessuna chiave API nel frontend.
 
@@ -55,6 +55,9 @@ uvicorn prototype.backend.app:app --reload --port 8000
 Endpoint del sito:
 
 - `GET /health`
+- `GET /home/profiles`
+- `GET /home/recommendations/{profile_id}`
+- `GET /search`
 - `GET /products/{item_id}`
 - `GET /popular`
 - `GET /recommendations/popular`
@@ -62,11 +65,28 @@ Endpoint del sito:
 - `POST /amazon/recommendations`
 - `POST /discover`
 
-## Ricerca AI-first a ruoli
+## Home con due profili
 
-La home non espone filtri manuali. L'utente scrive una query anche semplice, per esempio `mouse`, oppure una richiesta piu lunga, per esempio `mouse gaming wireless`.
+La home espone due viste selezionabili:
 
-Il frontend chiama:
+- `cold-start`: nessuna interazione disponibile; ranking prodotto esclusivamente da `Popular`;
+- `dataset-user`: utente `AEHOFUNZP6VT74RUDDCJ2VVIT56A`, scelto automaticamente per lo storico di training piu lungo (`118` prodotti, `120` interazioni note); ranking prodotto da `HybridGrid_SVD4_010_Content_025_Pop_065`.
+
+Il miglior ibrido e quello con il miglior `NDCG@10` sul validation set di `test_dataset2 / AmazonLike_v1` (`0.311657`). I pesi sono `10% SVD`, `25% Content TF-IDF` e `65% Popular`.
+
+Le raccomandazioni del profilo storico sono esportate in modo riproducibile dagli artefatti dei notebook, senza caricare in memoria la matrice completa dei profili utente durante la demo:
+
+```bash
+python prototype/scripts/export_home_profiles.py
+```
+
+La barra di ricerca resta sticky durante lo scroll ed e disponibile con entrambi i profili. Nella vista a cluster un secondo campo opzionale raccoglie la richiesta in linguaggio naturale per Gemini: il backend recupera e motiva prima prodotti e cluster con evidenze locali, poi Gemini puo riordinare i gruppi e riscriverne la presentazione senza cambiare i prodotti. La query puo anche essere mostrata come lista ordinata per prezzo, rating o numero di recensioni tramite `GET /search`.
+
+## Ricerca AI-first a ruoli (API)
+
+L'endpoint di discovery a query resta disponibile per esperimenti e integrazioni, anche se non e piu la vista iniziale del frontend.
+
+Un client puo chiamare:
 
 ```http
 POST /discover
@@ -76,7 +96,8 @@ Esempio payload:
 
 ```json
 {
-  "query": "mouse gaming wireless",
+  "query": "mouse",
+  "ai_query": "wireless, da gaming e comodo per uso prolungato",
   "limit": 80,
   "use_ai_support": true
 }
@@ -88,7 +109,7 @@ Il backend:
 - costruisce gruppi per ruolo come migliore scelta, economici, compromesso, stessa marca, prodotti complementari e alternative popolari;
 - motiva ogni prodotto con evidenze locali;
 - indica se le evidenze arrivano da metadati, recensioni o QA storiche;
-- usa Gemini solo come supporto opzionale per rifinire copy e label, senza permettere all'AI di scegliere prodotti o inventare dati.
+- usa Gemini solo dopo il recupero locale per riordinare i gruppi e rifinire il copy, senza permettere all'AI di scegliere prodotti o inventare dati.
 
 Se Gemini non e disponibile, la risposta resta completamente locale.
 
@@ -132,14 +153,17 @@ Backend:
 
 ```bash
 curl http://localhost:8000/health
+curl http://localhost:8000/home/profiles
+curl http://localhost:8000/home/recommendations/dataset-user
+curl "http://localhost:8000/search?query=mouse&limit=20"
 curl -X POST http://localhost:8000/discover -H "Content-Type: application/json" -d "{\"query\":\"mouse\",\"limit\":80,\"use_ai_support\":false}"
 ```
 
 Frontend:
 
-- ricerca `mouse` e verifica gruppi per ruolo;
-- ricerca `mouse gaming wireless` e verifica prodotti complementari separati;
-- click su una card e apertura dettaglio prodotto senza sezione Q&A e senza consigliati;
+- seleziona `Nuovo utente` e verifica `Popular 100%` e la classifica dei bestseller;
+- seleziona `Utente dal dataset` e verifica pesi dell'ibrido, storico e ranking differente;
+- click su una card e apertura dettaglio prodotto, poi ritorno allo stesso profilo della home;
 - prova senza `GEMINI_API_KEY` per verificare i fallback locali.
 
 ## Limiti rimasti
@@ -147,4 +171,4 @@ Frontend:
 - La ricerca locale resta semplice e basata su match testuali, sinonimi IT->EN e ruoli euristici.
 - Alcuni ruoli dipendono dalla copertura del catalogo: se mancano prodotti reali, il sistema mostra solo alternative grounded.
 - Le evidenze da recensioni e QA compaiono solo quando i parquet locali contengono dati rilevanti per quel prodotto.
-- Nessun profilo utente, storico interazioni, database o personalizzazione online.
+- I profili della home sono due casi dimostrativi fissi; non esistono ancora login, database o aggiornamento online dello storico.

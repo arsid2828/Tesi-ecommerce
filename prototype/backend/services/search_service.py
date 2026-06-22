@@ -30,12 +30,21 @@ def search_products(
         if exact_matches:
             filtered=exact_matches
         else:
-            expanded_terms=_expanded_query_terms(normalized_query) #aggiunge sinonimi IT->EN utili al dataset
-            filtered=[
+            query_tokens=[token for token in normalized_query.split() if len(token) > 1]
+            all_token_matches=[
                 product
                 for product in filtered
-                if any(_matches_query(product,term) for term in expanded_terms)
+                if query_tokens and all(_matches_query(product,token) for token in query_tokens)
             ]
+            if all_token_matches:
+                filtered=all_token_matches
+            else:
+                expanded_terms=_expanded_query_terms(normalized_query) #aggiunge sinonimi IT->EN utili al dataset
+                filtered=[
+                    product
+                    for product in filtered
+                    if any(_matches_query(product,term) for term in expanded_terms)
+                ]
     #ordinati per popolarità
     ordered=sorted(filtered,key=lambda product: product.popularity_score,reverse=True)
     return ordered[:limit]

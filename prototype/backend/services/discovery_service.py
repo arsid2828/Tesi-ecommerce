@@ -89,12 +89,15 @@ def discover_products(
     products: list[Product],
     query: str,
     evidence_service: Any,
+    ai_query: str="",
     limit: int=80,
     use_ai_support: bool=True,
 ) -> DiscoverySearchResponse:
     clean_query=_short_text(query,max_chars=160)
+    clean_ai_query=_short_text(ai_query,max_chars=240)
+    intent_query=_short_text(" ".join(part for part in [clean_query,clean_ai_query] if part),max_chars=320)
     safe_limit=max(1,min(int(limit or 80),200))
-    query_terms=_expanded_terms(clean_query)
+    query_terms=_expanded_terms(intent_query)
     candidates=_collect_candidates(products,clean_query,query_terms,safe_limit)
 
     if not candidates:
@@ -103,7 +106,7 @@ def discover_products(
     scored=[
         _score_product(
             product=product,
-            query=clean_query,
+            query=intent_query,
             query_terms=query_terms,
             evidence_service=evidence_service,
         )
@@ -114,14 +117,15 @@ def discover_products(
     groups=_build_role_groups(
         all_products=products,
         scored=scored,
-        query=clean_query,
+        query=intent_query,
         query_terms=query_terms,
         evidence_service=evidence_service,
     )
     source_summary=_source_summary(groups)
-    answer=_local_answer(clean_query,groups,source_summary)
+    answer=_local_answer(intent_query,groups,source_summary)
     response=DiscoverySearchResponse(
         query=clean_query,
+        ai_query=clean_ai_query,
         answer=answer,
         total_candidates=len(candidates),
         groups=groups,
@@ -627,7 +631,8 @@ def _local_answer(
 
 def _apply_ai_support(response: DiscoverySearchResponse) -> DiscoverySearchResponse:
     payload={
-        "query": response.query,
+        "catalog_query": response.query,
+        "user_request_for_gemini": response.ai_query,
         "source_summary": response.source_summary,
         "groups": [
             {
@@ -636,8 +641,18 @@ def _apply_ai_support(response: DiscoverySearchResponse) -> DiscoverySearchRespo
                 "description": group.description,
                 "keywords": group.keywords,
                 "sources": sorted({source for product in group.products for source in product.evidence_sources}),
-                "representative_titles": [
-                    _short_text(product.title,max_chars=120)
+                "products": [
+                    {
+                        "title": _short_text(product.title,max_chars=120),
+                        "local_reason": _short_text(product.role_reason,max_chars=220),
+                        "local_evidence": [
+                            {
+                                "source": evidence.source_label,
+                                "text": _short_text(evidence.text,max_chars=260),
+                            }
+                            for evidence in product.evidence[:2]
+                        ],
+                    }
                     for product in group.products[:MAX_AI_TITLES_PER_GROUP]
                 ],
             }
@@ -646,9 +661,10 @@ def _apply_ai_support(response: DiscoverySearchResponse) -> DiscoverySearchRespo
     }
     prompt=(
         "Sei un copy assistant per una demo di product discovery e-commerce. "
-        "Puoi solo riscrivere answer,label,description e reason dei gruppi gia calcolati localmente. "
-        "Non puoi cambiare prodotti, ruolo, ordine, fonti o inventare caratteristiche. "
-        "Usa solo i dati locali riassunti nel payload. "
+        "Ricevi una query catalogo, una richiesta testuale opzionale e cluster con evidenze locali. "
+        "Puoi riordinare i gruppi e riscrivere answer,label,description e reason per rispondere meglio alla richiesta. "
+        "Non puoi cambiare ruolo o prodotti dentro i gruppi, alterare fonti o inventare caratteristiche. "
+        "Usa esclusivamente le evidenze locali incluse nel payload. "
         "Restituisci solo JSON valido senza Markdown. "
         'Schema: {"answer":"...","groups":[{"role_id":"...","label":"...","description":"...","reason":"..."}]}. '
         "Answer massimo 2 frasi; description e reason massimo 1 frase.\n\n"
@@ -662,6 +678,7 @@ def _apply_ai_support(response: DiscoverySearchResponse) -> DiscoverySearchRespo
         raise ValueError("Campo groups mancante.")
 
     updates={}
+    requested_order=[]
     valid_ids={group.role_id for group in response.groups}
     for item in raw_groups:
         if not isinstance(item,dict):
@@ -669,6 +686,8 @@ def _apply_ai_support(response: DiscoverySearchResponse) -> DiscoverySearchRespo
         role_id=str(item.get("role_id") or "")
         if role_id not in valid_ids:
             continue
+        if role_id not in requested_order:
+            requested_order.append(role_id)
         label=_short_text(item.get("label"),max_chars=80)
         description=_short_text(item.get("description"),max_chars=180)
         reason=_short_text(item.get("reason"),max_chars=180)
@@ -679,7 +698,12 @@ def _apply_ai_support(response: DiscoverySearchResponse) -> DiscoverySearchRespo
         raise ValueError("Nessun aggiornamento AI valido.")
 
     groups=[]
-    for group in response.groups:
+    groups_by_id={group.role_id:group for group in response.groups}
+    ordered_role_ids=requested_order + [
+        group.role_id for group in response.groups if group.role_id not in requested_order
+    ]
+    for role_id in ordered_role_ids:
+        group=groups_by_id[role_id]
         update=updates.get(group.role_id)
         if not update:
             groups.append(group)
@@ -698,6 +722,7 @@ def _apply_ai_support(response: DiscoverySearchResponse) -> DiscoverySearchRespo
 
     return DiscoverySearchResponse(
         query=response.query,
+        ai_query=response.ai_query,
         answer=answer,
         total_candidates=response.total_candidates,
         groups=groups,

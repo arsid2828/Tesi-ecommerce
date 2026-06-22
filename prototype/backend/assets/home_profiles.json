@@ -1,0 +1,274 @@
+{
+  "dataset": "test_dataset2 / AmazonLike_v1",
+  "profiles": [
+    {
+      "profile_id": "cold-start",
+      "profile_type": "cold_start",
+      "label": "Nuovo utente",
+      "short_label": "Cold start",
+      "description": "Nessuno storico disponibile: la home usa esclusivamente la baseline di popolarità.",
+      "dataset_user_id": null,
+      "history_count": 0,
+      "known_interactions": 0,
+      "interests": [],
+      "algorithm": {
+        "model_id": "Popular",
+        "name": "Popular baseline",
+        "description": "Ordina i prodotti solo in base alla popolarità osservata nel catalogo.",
+        "weights": {
+          "svd": 0.0,
+          "content": 0.0,
+          "popularity": 1.0
+        },
+        "validation_metric_name": null,
+        "validation_metric_value": null
+      }
+    },
+    {
+      "profile_id": "dataset-user",
+      "profile_type": "known_user",
+      "label": "Utente dal dataset",
+      "short_label": "Storico lungo",
+      "description": "Profilo reale selezionato perché ha lo storico di training più lungo del dataset Amazon-like.",
+      "dataset_user_id": "AEHOFUNZP6VT74RUDDCJ2VVIT56A",
+      "history_count": 118,
+      "known_interactions": 120,
+      "interests": [
+        "All Electronics",
+        "Computers",
+        "Video Games",
+        "Home Audio & Theater"
+      ],
+      "algorithm": {
+        "model_id": "HybridGrid_SVD4_010_Content_025_Pop_065",
+        "name": "Miglior ibrido",
+        "description": "Il modello con il miglior NDCG@10 sul validation set combina segnali collaborativi, contenuto e popolarità.",
+        "weights": {
+          "svd": 0.1,
+          "content": 0.25,
+          "popularity": 0.65
+        },
+        "validation_metric_name": "NDCG@10",
+        "validation_metric_value": 0.3116572316478989
+      },
+      "recommendations": [
+        {
+          "item_id": "B003NR57BY",
+          "score": 0.898836,
+          "components": {
+            "svd": 1.0,
+            "content": 0.595343,
+            "popularity": 1.0
+          }
+        },
+        {
+          "item_id": "B001FWYGJS",
+          "score": 0.726414,
+          "components": {
+            "svd": 0.384116,
+            "content": 0.410364,
+            "popularity": 0.900632
+          }
+        },
+        {
+          "item_id": "B006JH8T3S",
+          "score": 0.692774,
+          "components": {
+            "svd": 0.477522,
+            "content": 0.440431,
+            "popularity": 0.822945
+          }
+        },
+        {
+          "item_id": "B00F0DD0I6",
+          "score": 0.466736,
+          "components": {
+            "svd": 0.168167,
+            "content": 0.653515,
+            "popularity": 0.440831
+          }
+        },
+        {
+          "item_id": "B003YFHCKY",
+          "score": 0.388596,
+          "components": {
+            "svd": 0.16443,
+            "content": 0.105232,
+            "popularity": 0.532069
+          }
+        },
+        {
+          "item_id": "B007CM0K86",
+          "score": 0.384877,
+          "components": {
+            "svd": 0.067381,
+            "content": 0.594218,
+            "popularity": 0.353207
+          }
+        },
+        {
+          "item_id": "B0092KJ9BU",
+          "score": 0.374716,
+          "components": {
+            "svd": 0.094476,
+            "content": 0.32196,
+            "popularity": 0.438121
+          }
+        },
+        {
+          "item_id": "B0029LJIFG",
+          "score": 0.367662,
+          "components": {
+            "svd": 0.107902,
+            "content": 0.302464,
+            "popularity": 0.432701
+          }
+        },
+        {
+          "item_id": "B00004Z5M1",
+          "score": 0.349062,
+          "components": {
+            "svd": 0.091655,
+            "content": 0.598612,
+            "popularity": 0.292683
+          }
+        },
+        {
+          "item_id": "B000AST3AK",
+          "score": 0.335261,
+          "components": {
+            "svd": 0.098599,
+            "content": 0.12256,
+            "popularity": 0.453478
+          }
+        },
+        {
+          "item_id": "B006U1YUZE",
+          "score": 0.335228,
+          "components": {
+            "svd": 0.138854,
+            "content": 0.439841,
+            "popularity": 0.325203
+          }
+        },
+        {
+          "item_id": "B00BGAA3S2",
+          "score": 0.334092,
+          "components": {
+            "svd": 0.047839,
+            "content": 0.805219,
+            "popularity": 0.196929
+          }
+        },
+        {
+          "item_id": "B003YT6RNS",
+          "score": 0.333934,
+          "components": {
+            "svd": 0.0769,
+            "content": 0.224577,
+            "popularity": 0.415537
+          }
+        },
+        {
+          "item_id": "B00G7UY3EG",
+          "score": 0.324178,
+          "components": {
+            "svd": 0.075639,
+            "content": 0.528968,
+            "popularity": 0.28365
+          }
+        },
+        {
+          "item_id": "B004MF11MU",
+          "score": 0.319966,
+          "components": {
+            "svd": 0.100012,
+            "content": 0.51881,
+            "popularity": 0.277326
+          }
+        },
+        {
+          "item_id": "B008GVOVK0",
+          "score": 0.302763,
+          "components": {
+            "svd": 0.065895,
+            "content": 0.376744,
+            "popularity": 0.31075
+          }
+        },
+        {
+          "item_id": "B000TLU67W",
+          "score": 0.297433,
+          "components": {
+            "svd": 0.019841,
+            "content": 0.881162,
+            "popularity": 0.115628
+          }
+        },
+        {
+          "item_id": "B002Z01QO2",
+          "score": 0.296925,
+          "components": {
+            "svd": 0.040973,
+            "content": 0.405639,
+            "popularity": 0.29449
+          }
+        },
+        {
+          "item_id": "B0009VXBAQ",
+          "score": 0.293838,
+          "components": {
+            "svd": 0.051917,
+            "content": 0.332543,
+            "popularity": 0.31617
+          }
+        },
+        {
+          "item_id": "B0040IUI46",
+          "score": 0.292395,
+          "components": {
+            "svd": 0.073739,
+            "content": 0.357971,
+            "popularity": 0.300813
+          }
+        },
+        {
+          "item_id": "B009ZIILLI",
+          "score": 0.280182,
+          "components": {
+            "svd": 0.074402,
+            "content": 0.409849,
+            "popularity": 0.261969
+          }
+        },
+        {
+          "item_id": "B0073J8BYS",
+          "score": 0.279005,
+          "components": {
+            "svd": 0.008209,
+            "content": 1.0,
+            "popularity": 0.04336
+          }
+        },
+        {
+          "item_id": "B00CMQTUSS",
+          "score": 0.278388,
+          "components": {
+            "svd": 0.041451,
+            "content": 0.566167,
+            "popularity": 0.204155
+          }
+        },
+        {
+          "item_id": "B009DL2TBA",
+          "score": 0.273815,
+          "components": {
+            "svd": 0.006128,
+            "content": 0.902566,
+            "popularity": 0.073171
+          }
+        }
+      ]
+    }
+  ]
+}

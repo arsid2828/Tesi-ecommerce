@@ -3,50 +3,125 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>AI Product Discovery</title>
-    <link rel="stylesheet" href="style.css?v=mission-cleanup-1">
+    <title>StoreLab · Home personalizzata</title>
+    <link rel="stylesheet" href="style.css?v=profiles-gemini-3">
   </head>
-  <body data-page="catalog">
-    <!--intestazione principale del prototipo-->
-    <header class="site-header">
+  <body data-page="home">
+    <header class="site-header home-header">
       <div class="header-main">
-        <div>
-          <h1>AI Product Discovery</h1>
-          <p class="intro">Ricerca prodotti full AI-first con ruoli, motivazioni ed evidenze locali.</p>
+        <div class="brand-block">
+          <p class="brand-kicker">E-commerce recommender demo</p>
+          <h1>StoreLab</h1>
+          <p class="intro">La stessa vetrina, due strategie di raccomandazione.</p>
+        </div>
+
+        <div id="profileSwitcher" class="profile-switcher" aria-label="Seleziona il profilo della home">
+          <button class="profile-option is-active" type="button" data-profile-id="cold-start" aria-pressed="true">
+            <span class="profile-avatar" aria-hidden="true">N</span>
+            <span>
+              <strong>Nuovo utente</strong>
+              <small>Cold start</small>
+            </span>
+          </button>
+          <button class="profile-option" type="button" data-profile-id="dataset-user" aria-pressed="false">
+            <span class="profile-avatar" aria-hidden="true">D</span>
+            <span>
+              <strong>Utente dataset</strong>
+              <small>118 prodotti nello storico</small>
+            </span>
+          </button>
         </div>
       </div>
     </header>
 
-    <!--esperienza principale di ricerca a query unica-->
-    <main class="page-shell">
-      <section class="discovery-panel" aria-labelledby="discoveryTitle">
-        <div class="section-heading">
-          <div>
-            <h2 id="discoveryTitle">Cerca per prodotto, esigenza o missione</h2>
-            <p>Il sistema raggruppa i prodotti in ruoli usando catalogo, recensioni e QA locali.</p>
-          </div>
-        </div>
-        <form id="discoveryForm" class="discovery-form">
-          <label class="field discovery-query-field">
-            <span>Query</span>
-            <input id="searchInput" type="search" placeholder="Es. mouse, mouse gaming wireless, telefono economico con buona batteria">
+    <main class="page-shell home-shell">
+      <section class="sticky-search-panel" aria-labelledby="searchTitle">
+        <form id="discoveryForm" class="home-search-form">
+          <label class="field home-query-field">
+            <span id="searchTitle">Cerca nel catalogo</span>
+            <input id="searchInput" type="search" placeholder="Es. mouse gaming wireless" autocomplete="off">
           </label>
-          <button id="searchButton" class="primary-button" type="submit">Analizza</button>
+
+          <label class="field search-view-field">
+            <span>Visualizzazione</span>
+            <select id="resultMode">
+              <option value="clusters">Cluster per ruolo</option>
+              <option value="sorted">Lista ordinata</option>
+            </select>
+          </label>
+
+          <label id="aiQueryField" class="field ai-query-field">
+            <span>Richiesta a Gemini (opzionale)</span>
+            <input id="aiQueryInput" type="text" placeholder="Es. wireless, gaming e comodo per uso prolungato" autocomplete="off">
+          </label>
+
+          <label id="sortField" class="field search-sort-field hidden">
+            <span>Ordina per</span>
+            <select id="sortBy">
+              <option value="price_asc">Prezzo crescente</option>
+              <option value="price_desc">Prezzo decrescente</option>
+              <option value="rating_desc">Rating più alto</option>
+              <option value="reviews_desc">Numero recensioni</option>
+            </select>
+          </label>
+
+          <button id="searchButton" class="primary-button search-submit" type="submit">Analizza</button>
+          <button id="clearSearchButton" class="clear-search-button hidden" type="button">Chiudi risultati</button>
         </form>
-        <div class="query-examples" aria-label="Esempi query">
-          <button class="example-chip" type="button" data-query="mouse gaming wireless">mouse gaming wireless</button>
-          <button class="example-chip" type="button" data-query="telefono economico batteria">telefono economico batteria</button>
-          <button class="example-chip" type="button" data-query="filtro acqua frigorifero">filtro acqua frigorifero</button>
+      </section>
+
+      <section id="searchResultsSection" class="search-results-section hidden" aria-labelledby="searchResultsTitle">
+        <div class="search-results-heading">
+          <div>
+            <p id="searchResultsKicker" class="section-kicker">Risultati ricerca</p>
+            <h2 id="searchResultsTitle">Risultati</h2>
+            <p id="searchResultsSummary"></p>
+          </div>
+          <span id="searchResultsCount" class="result-count"></span>
+        </div>
+        <div id="searchResultsContent" aria-live="polite"></div>
+      </section>
+
+      <section class="home-hero" aria-labelledby="homeTitle">
+        <div class="home-hero-copy">
+          <p id="profileKicker" class="home-kicker">Cold start</p>
+          <h2 id="homeTitle">Una vetrina utile anche senza storico</h2>
+          <p id="profileDescription">Caricamento del profilo in corso...</p>
+          <div id="profileFacts" class="profile-facts" aria-live="polite"></div>
+        </div>
+        <aside id="algorithmCard" class="algorithm-card" aria-live="polite">
+          <p class="algorithm-label">Modello attivo</p>
+          <h3>Popular baseline</h3>
+          <p>100% popolarità</p>
+        </aside>
+      </section>
+
+      <section class="home-products" aria-labelledby="primaryTitle">
+        <div class="section-heading home-section-heading">
+          <div>
+            <p id="primaryKicker" class="section-kicker">Baseline</p>
+            <h2 id="primaryTitle">I più popolari</h2>
+            <p id="primaryDescription">I prodotti con più segnali di popolarità nel catalogo.</p>
+          </div>
+          <span id="resultCount" class="result-count"></span>
+        </div>
+        <div id="primaryRecommendations" class="product-grid home-product-grid" aria-live="polite">
+          <p class="empty-state">Caricamento prodotti...</p>
         </div>
       </section>
 
-      <section id="discoverySummary" class="discovery-summary hidden" aria-live="polite"></section>
-      <section id="roleResults" class="role-results" aria-live="polite">
-        <p class="empty-state">Scrivi una query per generare gruppi come migliore scelta, economici, compromesso e prodotti complementari.</p>
+      <section id="secondarySection" class="home-products" aria-labelledby="secondaryTitle">
+        <div class="section-heading home-section-heading">
+          <div>
+            <p id="secondaryKicker" class="section-kicker">Continua a scoprire</p>
+            <h2 id="secondaryTitle">Altri bestseller</h2>
+            <p id="secondaryDescription">Altri prodotti ordinati con la stessa strategia.</p>
+          </div>
+        </div>
+        <div id="secondaryRecommendations" class="product-grid home-product-grid"></div>
       </section>
     </main>
 
-    <!--logica frontend vanilla JS-->
-    <script src="app.js?v=mission-cleanup-1"></script>
+    <script src="app.js?v=profiles-gemini-3"></script>
   </body>
 </html>
