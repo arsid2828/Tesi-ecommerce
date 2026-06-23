@@ -133,7 +133,7 @@ Le evidenze usate dalla discovery vengono recuperate localmente da:
 - recensioni testuali da `ratings.parquet`, se presente;
 - futuri file opzionali `qa_demo.json`, `product_qa_demo.json`, `reviews_demo.json`, `product_reviews_demo.json`.
 
-La pagina dettaglio prodotto contiene solo il dettaglio del prodotto. Q&A e consigliati non sono piu esposti nel sito.
+La pagina dettaglio mostra anche prodotti simili, alternative e complementari in card cliccabili. Il content script dell'estensione non inietta piu pannelli dimostrativi nelle pagine; il popup continua a rilevare il prodotto corrente e a mostrare i propri consigli.
 
 ## Avviare il frontend
 

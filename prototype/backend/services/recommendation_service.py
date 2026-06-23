@@ -17,8 +17,6 @@ from prototype.backend.schemas import (
     RecommendationProduct,
 )
 from prototype.backend.services.discovery_service import call_gemini
-from prototype.backend.services.search_service import search_products
-
 try:
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.metrics.pairwise import cosine_similarity
@@ -62,7 +60,10 @@ def contextual_recommendations(
         return None
 
     safe_limit=max(1,min(int(limit or DEFAULT_GROUP_LIMIT),8))
-    candidates=[product for product in products if product.item_id != source.item_id]
+    candidates=_contextual_candidate_pool(
+        source,
+        [product for product in products if product.item_id != source.item_id],
+    )
     scored=_score_local_candidates(source,candidates)
 
     groups=_build_local_groups(source,products,scored,evidence_service,safe_limit)
@@ -139,6 +140,94 @@ def _score_local_candidates(source: Product,candidates: list[Product]) -> list[L
     return scored
 
 
+def _contextual_candidate_pool(source: Product,candidates: list[Product]) -> list[Product]:
+    """Riduce il catalogo ai candidati davvero pertinenti prima del TF-IDF."""
+    source_family=_product_family(source)
+    complement_terms=_complement_terms(source)
+    source_tokens=set(_tokens(source.title))
+    ranked=[]
+    fallback=[]
+    for product in candidates:
+        family=_product_family(product)
+        title_tokens=set(_tokens(product.title))
+        overlap=len(source_tokens & title_tokens)
+        same_family=bool(source_family and family == source_family)
+        complements=any(_title_matches_complement(product,term) for term in complement_terms)
+        if same_family or complements or overlap >= 2:
+            priority=0 if same_family else 1 if complements else 2
+            ranked.append((priority,-overlap,-_quality_score(product),product.item_id,product))
+        elif _normalize(product.category) == _normalize(source.category):
+            fallback.append(product)
+
+    ranked.sort(key=lambda item:item[:4])
+    selected=[item[-1] for item in ranked[:700]]
+    seen={product.item_id for product in selected}
+    if len(selected) < 180:
+        fallback.sort(key=lambda product:(-_quality_score(product),product.item_id))
+        for product in fallback:
+            if product.item_id in seen:
+                continue
+            selected.append(product)
+            seen.add(product.item_id)
+            if len(selected) >= 180:
+                break
+    return selected
+
+
+def _product_family(product: Product) -> str | None:
+    title=_normalize(product.title)
+    if re.search(r"\b(cards against|card game|playing cards|trading card game)\b",title):
+        return "card_game"
+    if re.search(r"\bboard game\b",title):
+        return "board_game"
+    if re.search(r"\b(mouse pad|mouse mat|mouzpad|wrist rest)\b",title):
+        return "mouse_accessory"
+    mouse_noise=r"\b(mickey|minnie|scrapbook|puzzle|balloon|rodent|trap|glue|bait|pest|insect|platform|tray)\b"
+    if re.search(
+        r"\b(computer mouse|wireless mouse|corded mouse|gaming mouse|laser mouse|optical mouse|touch mouse|trackball)\b",
+        title,
+    ) and not re.search(mouse_noise,title):
+        return "computer_mouse"
+    if re.search(r"\b(receiver for|usb receiver for|unifying usb receiver for)\b",title):
+        return "computer_receiver"
+    if re.search(r"\bkeyboard\b",title) and not re.search(
+        r"\b(phone|smartphone|cover|case|skin|protector|replacement|tablet|ipad|macbook)\b",
+        title,
+    ):
+        return "computer_keyboard"
+    if re.search(r"\b(receiver|dongle)\b",title) and re.search(r"\b(mouse|keyboard|unifying)\b",title):
+        return "computer_receiver"
+    if (
+        re.search(r"\b(mouse|trackball)\b",title)
+        and _normalize(product.category) in {"electronics","computers"}
+        and not re.search(mouse_noise + r"|\b(earphone jack|cover|case)\b",title)
+    ):
+        return "computer_mouse"
+    if re.search(r"\busb (?:2\.0 |3\.0 )?hub\b",title) and not re.search(
+        r"\b(power supply|adapter|cable)\b.*\bfor usb hub\b",
+        title,
+    ):
+        return "usb_hub"
+    family_patterns=[
+        ("headphones",r"\b(headphones|headset|earbuds|earphones)\b"),
+        ("monitor",r"\bmonitor\b"),
+        ("router",r"\b(router|wi-fi extender|wifi extender|access point)\b"),
+        ("printer",r"\bprinter\b"),
+        ("camera",r"\b(camera|camcorder)\b"),
+        ("controller",r"\b(controller|gamepad)\b"),
+        ("storage",r"\b(hard drive|ssd|flash drive|memory card)\b"),
+        ("laptop",r"\b(laptop|notebook computer)\b"),
+        ("tablet",r"\btablet\b"),
+        ("phone",r"\b(phone|smartphone|iphone)\b"),
+        ("refrigerator_filter",r"\b(refrigerator|water) filter\b"),
+        ("vacuum",r"\bvacuum\b"),
+    ]
+    for family,pattern in family_patterns:
+        if re.search(pattern,title):
+            return family
+    return None
+
+
 def _build_local_groups(
     source: Product,
     all_products: list[Product],
@@ -149,10 +238,15 @@ def _build_local_groups(
     seen={source.item_id}
     groups=[]
 
+    source_family=_product_family(source)
+    same_family=[item for item in scored if source_family and _product_family(item.product) == source_family]
+    comparable=same_family if len(same_family) >= limit else scored
+    source_brand=_extract_brand(source.title)
+
     similar_ranked=sorted(
-        scored,
+        [item for item in comparable if _is_valid_recommendation(source,item,"similar")],
         key=lambda item: (
-            -(0.50*item.text_score + 0.20*item.category_score + 0.18*item.quality_score + 0.12*item.price_affinity),
+            -(0.54*item.text_score + 0.20*item.quality_score + 0.16*item.price_affinity + 0.10*float(bool(source_brand and item.brand == source_brand))),
             item.product.item_id,
         ),
     )
@@ -161,51 +255,89 @@ def _build_local_groups(
         _local_group(
             source=source,
             role_id="similar",
-            label="Migliori prodotti simili",
-            description="Prodotti vicini al prodotto aperto, selezionati per somiglianza, prezzo, qualita e popolarita locale.",
+            label="Prodotti simili",
+            description="Articoli della stessa tipologia, ordinati per caratteristiche, valutazioni e vicinanza di prezzo.",
             candidates=similar,
             evidence_service=evidence_service,
-            reason="Scelti dal catalogo locale confrontando titolo, descrizione, categoria, prezzo, rating e popolarita.",
+            reason="Confronto tra tipologia, caratteristiche, prezzo e valutazioni.",
         )
     )
 
     alternative_ranked=sorted(
-        scored,
+        [item for item in comparable if _is_valid_recommendation(source,item,"alternatives")],
         key=lambda item: (
-            -(0.28*item.category_score + 0.22*item.quality_score + 0.20*item.price_affinity + 0.18*item.diversity_score + 0.12*item.text_score),
+            -(0.32*item.diversity_score + 0.28*item.quality_score + 0.25*item.price_affinity + 0.15*item.text_score),
             item.product.item_id,
         ),
     )
     alternatives=_take_unique(alternative_ranked,seen,limit)
-    if not alternatives:
-        alternatives=_take_unique(alternative_ranked,{source.item_id},limit)
     groups.append(
         _local_group(
             source=source,
             role_id="alternatives",
-            label="Alternative valide",
-            description="Alternative confrontabili dal dataset locale, utili se vuoi cambiare marca, prezzo o compromesso.",
+            label="Alternative da confrontare",
+            description="Altre opzioni della stessa tipologia, utili per confrontare marca, prezzo e valutazioni.",
             candidates=alternatives,
             evidence_service=evidence_service,
-            reason="Selezione locale orientata a diversita di marca, prezzo vicino e qualita complessiva.",
+            reason="Alternative con un buon equilibrio tra prezzo, valutazioni e varietà di marca.",
         )
     )
 
-    bundle_ranked=_bundle_candidates(source,all_products,scored)
+    bundle_ranked=[
+        item
+        for item in _bundle_candidates(source,all_products,scored)
+        if _is_valid_recommendation(source,item,"together")
+    ]
     together=_take_unique(bundle_ranked,seen,limit)
     groups.append(
         _local_group(
             source=source,
             role_id="together",
-            label="Complementari e utili assieme",
-            description="Prodotti che possono affiancare quello aperto: accessori, ricambi o articoli di supporto dal dataset locale.",
+            label="Utili insieme",
+            description="Accessori e prodotti complementari che possono completare l'acquisto.",
             candidates=together,
             evidence_service=evidence_service,
-            reason="Il ruolo usa parole chiave di accessori o ricambi quando presenti; altrimenti applica un fallback locale su categoria, qualita e diversita.",
+            reason="Prodotti complementari scelti in base al tipo di utilizzo.",
         )
     )
 
     return [group for group in groups if group is not None and group.products]
+
+
+def _is_valid_recommendation(source: Product,candidate: LocalCandidate,role_id: str) -> bool:
+    product=candidate.product
+    if not product.title or not product.image_url:
+        return False
+
+    source_family=_product_family(source)
+    candidate_family=_product_family(product)
+    same_category=_normalize(product.category) == _normalize(source.category)
+
+    if role_id == "similar":
+        if source_family:
+            return (
+                candidate_family == source_family
+                and candidate.text_score >= 0.10
+                and candidate.quality_score >= 0.35
+            )
+        return same_category and candidate.text_score >= 0.15 and candidate.quality_score >= 0.35
+
+    if role_id == "alternatives":
+        if source_family:
+            return (
+                candidate_family == source_family
+                and candidate.text_score >= 0.10
+                and candidate.quality_score >= 0.40
+            )
+        return same_category and candidate.text_score >= 0.12 and candidate.quality_score >= 0.40
+
+    if role_id == "together":
+        complement_terms=_complement_terms(source)
+        return bool(complement_terms) and any(
+            _title_matches_complement(product,term)
+            for term in complement_terms
+        )
+    return False
 
 
 def _local_group(
@@ -275,21 +407,20 @@ def _local_product_reason(
     product=candidate.product
     sources=", ".join(_unique_source_labels(evidence)) or "metadati"
     if role_id == "similar":
-        category_text="stessa categoria" if candidate.category_score else "categoria diversa ma contenuto vicino"
         return (
-            f"Simile per {category_text}, prezzo {_format_price(product.price)} e rating {_format_rating(product.average_rating)}. "
-            f"Marca stimata: {candidate.brand or 'non chiara'}. Fonti locali: {sources}."
+            f"Stessa tipologia del prodotto aperto, con prezzo {_format_price(product.price)} "
+            f"e valutazione {_format_rating(product.average_rating)} su 5."
         )
     if role_id == "alternatives":
-        brand_text=f"marca diversa ({candidate.brand})" if candidate.brand else "marca non chiara"
+        brand_text=f"di {candidate.brand}" if candidate.brand else "di un'altra linea"
         return (
-            f"Alternativa con {brand_text}, prezzo {_format_price(product.price)} e qualita locale basata su rating, recensioni e popolarita. "
-            f"Fonti: {sources}."
+            f"Alternativa {brand_text}, proposta a {_format_price(product.price)} "
+            f"con valutazione {_format_rating(product.average_rating)} su 5."
         )
     if role_id == "together":
         return (
-            f"Utile assieme al prodotto aperto: puo fare da accessorio, ricambio o supporto d'uso. "
-            f"Prezzo {_format_price(product.price)}, rating {_format_rating(product.average_rating)}."
+            f"Può completare l'uso del prodotto aperto. Prezzo {_format_price(product.price)}, "
+            f"valutazione {_format_rating(product.average_rating)} su 5."
         )
     return f"{group_reason} Fonti: {sources}."
 
@@ -344,26 +475,33 @@ def _bundle_candidates(
 ) -> list[LocalCandidate]:
     complement_terms=_complement_terms(source)
     if not complement_terms:
-        ranked=[item for item in scored if item.bundle_score > 0]
-        return sorted(ranked,key=lambda item:(-item.bundle_score,item.product.item_id))
+        return []
 
     by_id={item.product.item_id:item for item in scored}
-    ids=[]
+    primary=[]
+    remaining=[]
+    seen=set()
     for term in complement_terms:
-        for product in search_products(all_products,term,limit=18):
-            if product.item_id == source.item_id or product.item_id in ids:
-                continue
-            ids.append(product.item_id)
-
-    term_matches=[
-        by_id[item_id]
-        for item_id in ids
-        if item_id in by_id
-    ]
-    if term_matches:
-        return sorted(term_matches,key=lambda item:(-item.bundle_score,-item.quality_score,item.product.item_id))
-    ranked=[item for item in scored if item.bundle_score > 0]
-    return sorted(ranked,key=lambda item:(-item.bundle_score,item.product.item_id))
+        matches=[
+            by_id[product.item_id]
+            for product in all_products
+            if product.item_id in by_id
+            and product.item_id != source.item_id
+            and _title_matches_complement(product,term)
+        ]
+        matches.sort(key=lambda item:(-item.quality_score,-item.product.popularity_score,item.product.item_id))
+        unique=[item for item in matches if item.product.item_id not in seen]
+        if not unique:
+            continue
+        primary.append(unique[0])
+        seen.add(unique[0].product.item_id)
+        for item in unique[1:]:
+            if item.product.item_id not in seen:
+                remaining.append(item)
+                seen.add(item.product.item_id)
+    if primary:
+        return primary + remaining
+    return []
 
 
 def _take_unique(items: list[LocalCandidate],seen: set[str],limit: int) -> list[LocalCandidate]:
@@ -415,6 +553,25 @@ def _bundle_score(source: Product,product: Product) -> float:
 
 def _complement_terms(product: Product) -> list[str]:
     text=_product_text(product)
+    family=_product_family(product)
+    family_mapping={
+        "computer_mouse": ["keyboard","mouse pad","wrist rest","usb hub"],
+        "computer_keyboard": ["mouse","wrist rest","usb hub","monitor"],
+        "headphones": ["headphone stand","audio cable","usb hub"],
+        "phone": ["case","charger","cable","screen protector","headphones","earbuds"],
+        "camera": ["tripod","memory card","battery","lens","case"],
+        "printer": ["ink","cartridge","paper"],
+        "laptop": ["mouse","keyboard","monitor","cable","charger"],
+        "controller": ["headset","charger","cable"],
+        "refrigerator_filter": ["replacement filter"],
+        "vacuum": ["filter","replacement bag","brush"],
+        "card_game": [],
+        "board_game": [],
+        "usb_hub": [],
+        "router": ["ethernet cable","wifi adapter"],
+    }
+    if family:
+        return family_mapping.get(family,[])
     mapping={
         "phone": ["case","charger","cable","screen protector","headphones","earbuds"],
         "smartphone": ["case","charger","cable","screen protector","headphones","earbuds"],
@@ -439,6 +596,26 @@ def _complement_terms(product: Product) -> list[str]:
         if key in text:
             terms.extend(values)
     return _dedupe(terms)[:12]
+
+
+def _title_matches_complement(product: Product,term: str) -> bool:
+    title=_normalize(product.title)
+    if term == "keyboard":
+        return bool(re.search(r"\bkeyboard\b",title)) and not bool(re.search(
+            r"\b(phone|cover|case|skin|protector|replacement|receiver|tablet|ipad|macbook|drawer|platform|tray|desk|stand|bag|midi|piano|organ|remote|dock|folio)\b",
+            title,
+        ))
+    if term == "mouse":
+        return _product_family(product) == "computer_mouse"
+    if term == "mouse pad":
+        return bool(re.search(r"\b(mouse pad|mouse mat|mouzpad)\b",title))
+    if term == "wrist rest":
+        return "wrist rest" in title
+    if term == "usb hub":
+        is_hub=bool(re.search(r"\busb (?:2\.0 |3\.0 )?hub\b",title))
+        is_hub_accessory=bool(re.search(r"\b(power supply|adapter|cable)\b.*\bfor usb hub\b",title))
+        return is_hub and not is_hub_accessory
+    return bool(re.search(rf"\b{re.escape(term)}\b",title))
 
 
 def _apply_local_ai_support(response: ContextualRecommendationsResponse) -> ContextualRecommendationsResponse:

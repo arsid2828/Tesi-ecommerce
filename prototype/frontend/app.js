@@ -478,7 +478,7 @@ async function initProductPage() {
   state.currentProfileId = safeProfileId;
   if (profileId === "cold-start" || profileId === "dataset-user") {
     const backLink = document.getElementById("homeBackLink");
-    const homeParams = new URLSearchParams({ profile: safeProfileId, v: "profiles-gemini-3" });
+    const homeParams = new URLSearchParams({ profile: safeProfileId, v: "product-recommendations-1" });
     ["q", "view", "sort", "intent"].forEach((key) => {
       if (params.get(key)) {
         homeParams.set(key, params.get(key));
@@ -490,7 +490,10 @@ async function initProductPage() {
     renderMessage("productDetail", "Prodotto non specificato.");
     return;
   }
-  await loadProductDetail(itemId);
+  await Promise.all([
+    loadProductDetail(itemId),
+    loadProductRecommendations(itemId),
+  ]);
 }
 
 async function fetchJson(path) {
@@ -523,9 +526,67 @@ async function loadProductDetail(itemId) {
   }
 }
 
+async function loadProductRecommendations(itemId) {
+  try {
+    const response = await fetchJson(
+      `/recommendations/contextual/${encodeURIComponent(itemId)}?limit=4&use_ai_support=false`,
+    );
+    renderProductRecommendations(response);
+  } catch (error) {
+    console.error(error);
+    document.getElementById("productRecommendationsSummary").textContent = "I consigli non sono disponibili in questo momento.";
+    renderMessage("productRecommendationGroups", "Nessun consiglio disponibile.");
+  }
+}
+
+function renderProductRecommendations(response) {
+  const groups = response.groups || [];
+  const container = document.getElementById("productRecommendationGroups");
+  container.innerHTML = "";
+  const recommendationCount = groups.reduce(
+    (total, group) => total + Number((group.products || []).length),
+    0,
+  );
+  document.getElementById("productRecommendationsSummary").textContent = groups.length
+    ? recommendationCount === 1
+      ? "1 suggerimento pertinente selezionato per questo prodotto."
+      : `${recommendationCount} suggerimenti pertinenti selezionati per questo prodotto.`
+    : "Non ho trovato altri prodotti pertinenti.";
+
+  if (!groups.length) {
+    renderMessage("productRecommendationGroups", "Nessun consiglio disponibile.");
+    return;
+  }
+
+  groups.forEach((group) => {
+    const section = document.createElement("section");
+    section.className = `contextual-group contextual-${group.role_id || "generic"}`;
+    const heading = document.createElement("div");
+    heading.className = "contextual-group-heading";
+    heading.innerHTML = `
+      <div>
+        <h3>${escapeHtml(group.label)}</h3>
+        <p>${escapeHtml(group.description || "")}</p>
+      </div>
+      <span class="role-size">${escapeHtml(formatProductCount(group.size))}</span>
+    `;
+
+    const grid = document.createElement("div");
+    grid.className = "product-grid contextual-product-grid";
+    (group.products || []).forEach((product) => {
+      grid.appendChild(createProductCard(product, { showRoleReason: true }));
+    });
+
+    section.appendChild(heading);
+    section.appendChild(grid);
+    container.appendChild(section);
+  });
+}
+
 function createProductCard(product, options = {}) {
   const card = document.createElement("article");
   card.className = "product-card";
+  card.dataset.itemId = product.item_id;
 
   const imageBox = createImageBox(product, "product-image");
   if (options.showRecommendation && product.rank) {
@@ -568,12 +629,13 @@ function createProductCard(product, options = {}) {
   const button = document.createElement("button");
   button.className = "secondary-button";
   button.type = "button";
+  button.dataset.itemId = product.item_id;
   button.textContent = "Vedi prodotto";
   button.addEventListener("click", () => {
     const detailParams = new URLSearchParams({
       id: product.item_id,
       profile: state.currentProfileId,
-      v: "profiles-gemini-3",
+      v: "product-recommendations-1",
     });
     const homeParams = new URLSearchParams(window.location.search);
     ["q", "view", "sort", "intent"].forEach((key) => {
@@ -626,9 +688,8 @@ function renderProductDetail(product) {
     <p class="description">${escapeHtml(product.description || "Descrizione non disponibile.")}</p>
     <dl class="stats">
       <div><dt>Prezzo</dt><dd>${escapeHtml(formatPrice(product.price))}</dd></div>
-      <div><dt>Average rating</dt><dd>${formatRating(product.average_rating)}</dd></div>
-      <div><dt>Rating count</dt><dd>${Number(product.rating_count || 0).toLocaleString("it-IT")}</dd></div>
-      <div><dt>Popularity score</dt><dd>${Number(product.popularity_score || 0).toFixed(4)}</dd></div>
+      <div><dt>Valutazione</dt><dd>★ ${formatRating(product.average_rating)} su 5</dd></div>
+      <div><dt>Recensioni</dt><dd>${Number(product.rating_count || 0).toLocaleString("it-IT")}</dd></div>
     </dl>
   `;
 
@@ -648,7 +709,11 @@ function createImageBox(product, className) {
   const image = document.createElement("img");
   image.src = product.image_url;
   image.alt = product.title;
-  image.loading = "lazy";
+  image.decoding = "async";
+  image.loading = className === "detail-image" ? "eager" : "lazy";
+  if (className === "detail-image") {
+    image.fetchPriority = "high";
+  }
   image.addEventListener("error", () => {
     wrapper.querySelector("img")?.remove();
     wrapper.prepend(createPlaceholder());

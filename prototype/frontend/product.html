@@ -4,26 +4,39 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Dettaglio prodotto</title>
-    <link rel="stylesheet" href="style.css?v=profiles-gemini-3">
+    <link rel="stylesheet" href="style.css?v=product-recommendations-1">
   </head>
   <body data-page="product">
     <!--intestazione pagina dettaglio-->
     <header class="site-header compact">
       <div class="header-main">
         <div>
-          <a id="homeBackLink" class="back-link" href="index.html?v=profiles-gemini-3">Torna alla home</a>
+          <a id="homeBackLink" class="back-link" href="index.html?v=product-recommendations-1">Torna alla home</a>
           <h1>Dettaglio prodotto</h1>
         </div>
       </div>
     </header>
 
     <!--contenuto principale della pagina prodotto-->
-    <main class="page-shell">
+    <main class="page-shell product-shell">
       <!--dettaglio prodotto caricato via API-->
       <section id="productDetail" class="product-detail"></section>
+
+      <section class="product-recommendations" aria-labelledby="productRecommendationsTitle">
+        <div class="section-heading product-recommendations-heading">
+          <div>
+            <p class="section-kicker">Continua a scoprire</p>
+            <h2 id="productRecommendationsTitle">Potrebbero interessarti</h2>
+            <p id="productRecommendationsSummary">Cerco prodotti simili, alternative e accessori utili.</p>
+          </div>
+        </div>
+        <div id="productRecommendationGroups" class="contextual-groups" aria-live="polite">
+          <p class="empty-state">Caricamento consigli...</p>
+        </div>
+      </section>
     </main>
 
     <!--logica frontend vanilla JS-->
-    <script src="app.js?v=profiles-gemini-3"></script>
+    <script src="app.js?v=product-recommendations-1"></script>
   </body>
 </html>

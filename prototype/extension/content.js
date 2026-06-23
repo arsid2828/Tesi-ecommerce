@@ -2,7 +2,10 @@ const EXTENSION_BACKEND_URL = "http://localhost:8000";
 const EXTENSION_LOCAL_PRODUCT_URL = "http://localhost:3000/product.html";
 const EXTENSION_BOX_ID = "thesisExtensionDemoBox";
 
-initContentBox();
+//Rimuove anche un eventuale pannello lasciato da una versione precedente dell'estensione.
+document.getElementById(EXTENSION_BOX_ID)?.remove();
+
+//Il content script resta invisibile: rileva il prodotto per il popup senza aggiungere box alla pagina.
 initMessageListener();
 
 //Inserisce box demo su pagina prodotto locale o Amazon riconosciuta

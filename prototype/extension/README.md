@@ -14,7 +14,7 @@ L'estensione non raccoglie dati personali, non salva cronologia utente e non int
 - mostra prodotti simili, scelte alternative e prodotti da acquistare assieme, tutti presi solo dal dataset locale;
 - apre la pagina prodotto locale quando si clicca un consiglio;
 - usa Gemini solo dal backend per rifinire label e motivazioni, senza permettere all'AI di scegliere o inventare prodotti;
-- inserisce nella pagina prodotto locale un box con gli stessi consigli cliccabili;
+- resta invisibile nella pagina e passa al popup il prodotto rilevato, senza inserire pannelli dimostrativi;
 - riconosce pagine prodotto Amazon reali su `amazon.it`, `amazon.com`, `amazon.co.uk`, `amazon.de`, `amazon.fr` e `amazon.es`;
 - sulle pagine Amazon legge prodotti reali gia' visibili nel DOM della pagina, li organizza in gruppi e li rende cliccabili;
 - se il backend e Gemini non sono disponibili, su Amazon mostra comunque un fallback con candidati reali letti dalla pagina.
@@ -47,7 +47,7 @@ Poi:
 
 1. ricaricare l'estensione da `chrome://extensions`;
 2. aprire una pagina prodotto Amazon, per esempio una URL nel formato `https://www.amazon.it/dp/<ASIN>`;
-3. verificare che nella pagina compaia il box `Tesi E-commerce Demo`;
+3. verificare che l'estensione non aggiunga box o pannelli alla pagina;
 4. aprire il popup e controllare che mostri `Prodotto Amazon rilevato`, l'ASIN e, se la pagina contiene card correlate leggibili, consigli reali cliccabili.
 
 ## Limiti
