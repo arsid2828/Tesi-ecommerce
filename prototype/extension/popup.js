@@ -1,3 +1,5 @@
+// Popup Manifest V3 dell'estensione demo.
+// Mostra prodotto corrente e consigli contestuali leggendo backend locale e content script.
 const BACKEND_URL = "http://localhost:8000";
 const LOCAL_PRODUCT_URL = "http://localhost:3000/product.html";
 const DEFAULT_PRODUCT_IMAGE_URL = "placeholder-product.svg";
@@ -13,6 +15,8 @@ const popupState = {
 
 document.addEventListener("DOMContentLoaded", initPopup);
 
+// Punto di ingresso del popup.
+// Legge la tab attiva, rileva il prodotto e carica stato backend + raccomandazioni.
 async function initPopup() {
   const tab = await getActiveTab();
   popupState.activeTab = tab;
@@ -27,6 +31,8 @@ async function initPopup() {
   await Promise.all([checkBackendStatus(), loadRecommendations()]);
 }
 
+// Recupera la tab attiva nella finestra corrente.
+// Wrappa chrome.tabs.query in Promise per usare async/await nel resto del popup.
 function getActiveTab() {
   return new Promise((resolve) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -35,6 +41,8 @@ function getActiveTab() {
   });
 }
 
+// Aggiorna lo stato UI in base al prodotto rilevato.
+// Distingue pagina locale, pagina Amazon e pagina non riconosciuta.
 async function updateProductPageState(tab, currentUrl) {
   const detection = await detectActiveProduct(tab, currentUrl);
   const product = detection.product;
@@ -72,6 +80,8 @@ async function updateProductPageState(tab, currentUrl) {
   await loadCurrentProduct();
 }
 
+// Combina rilevamento da URL e risposta del content script.
+// Il DOM ha priorita quando fornisce titolo, immagine o candidati Amazon reali.
 async function detectActiveProduct(tab, currentUrl) {
   const urlProduct = window.ThesisProductDetector.detectFromUrl(currentUrl);
   const pageData = await requestDetectedProduct(tab);
@@ -100,6 +110,8 @@ async function detectActiveProduct(tab, currentUrl) {
   };
 }
 
+// Chiede al content script prodotto e candidati Amazon della pagina.
+// Usa un timeout breve per non bloccare il popup se il content script non risponde.
 function requestDetectedProduct(tab) {
   return new Promise((resolve) => {
     if (!tab || typeof tab.id === "undefined" || !chrome.tabs || !chrome.tabs.sendMessage) {
@@ -122,6 +134,8 @@ function requestDetectedProduct(tab) {
   });
 }
 
+// Helper GET verso il backend locale.
+// Centralizza errori HTTP per health check, dettagli e consigli.
 async function fetchBackend(path) {
   const response = await fetch(`${BACKEND_URL}${path}`);
   if (!response.ok) {
@@ -130,6 +144,8 @@ async function fetchBackend(path) {
   return response.json();
 }
 
+// Helper POST JSON verso il backend locale.
+// Usato per organizzare candidati Amazon reali estratti dal DOM.
 async function postBackend(path, body) {
   const response = await fetch(`${BACKEND_URL}${path}`, {
     method: "POST",
@@ -144,6 +160,8 @@ async function postBackend(path, body) {
   return response.json();
 }
 
+// Verifica se FastAPI e raggiungibile.
+// Aggiorna il badge del popup senza interrompere eventuali fallback locali.
 async function checkBackendStatus() {
   const status = document.getElementById("backendStatus");
   try {
@@ -156,6 +174,8 @@ async function checkBackendStatus() {
   }
 }
 
+// Carica e mostra il prodotto corrente nel popup.
+// Per Amazon usa i dati gia letti dalla pagina, per locale chiama /products/{item_id}.
 async function loadCurrentProduct() {
   const result = document.getElementById("productResult");
   if (popupState.amazonProduct) {
@@ -181,6 +201,8 @@ async function loadCurrentProduct() {
   }
 }
 
+// Renderizza il prodotto del catalogo locale.
+// Mostra immagine, categoria, titolo, item_id, rating e recensioni.
 function renderProduct(product) {
   const result = document.getElementById("productResult");
   result.innerHTML = "";
@@ -220,6 +242,8 @@ function renderProduct(product) {
   result.appendChild(layout);
 }
 
+// Renderizza il prodotto Amazon rilevato.
+// Evidenzia ASIN e quanti candidati reali sono stati letti dalla pagina.
 function renderAmazonProduct(product) {
   const result = document.getElementById("productResult");
   result.innerHTML = "";
@@ -262,6 +286,8 @@ function renderAmazonProduct(product) {
   result.appendChild(layout);
 }
 
+// Decide quale sorgente raccomandazioni caricare.
+// Locale, Amazon o fallback Popular dipendono dal tipo di pagina corrente.
 async function loadRecommendations() {
   if (popupState.itemId) {
     await loadLocalRecommendations();
@@ -276,6 +302,8 @@ async function loadRecommendations() {
   await loadPopularRecommendations();
 }
 
+// Carica consigli contestuali per prodotto locale.
+// Il backend sceglie prodotti solo dal catalogo demo e puo rifinire testi con Gemini.
 async function loadLocalRecommendations() {
   const status = document.getElementById("recommendationsStatus");
   status.textContent = "Caricamento...";
@@ -291,6 +319,8 @@ async function loadLocalRecommendations() {
   }
 }
 
+// Organizza candidati Amazon gia letti dal content script.
+// Se il backend non risponde usa un fallback locale senza inventare prodotti.
 async function loadAmazonRecommendations() {
   const status = document.getElementById("recommendationsStatus");
   if (!popupState.amazonCandidates.length) {
@@ -320,6 +350,8 @@ async function loadAmazonRecommendations() {
   }
 }
 
+// Carica prodotti popolari quando non c'e una pagina prodotto.
+// Serve come stato utile del popup anche fuori da contesti riconosciuti.
 async function loadPopularRecommendations() {
   const status = document.getElementById("recommendationsStatus");
   try {
@@ -339,6 +371,8 @@ async function loadPopularRecommendations() {
   }
 }
 
+// Renderizza i gruppi di raccomandazioni nel popup.
+// Normalizza simili e complementari in due blocchi compatti e cliccabili.
 function renderRecommendationGroups(groups, kind) {
   const list = document.getElementById("recommendationsList");
   list.innerHTML = "";
@@ -389,6 +423,8 @@ function renderRecommendationGroups(groups, kind) {
   });
 }
 
+// Trasforma i gruppi backend nella vista compatta del popup.
+// Deduplica prodotti e separa consigli simili da complementari.
 function normalizeRecommendationGroups(groups, kind) {
   const safeGroups = Array.isArray(groups) ? groups : [];
   const similarProducts = [];
@@ -436,6 +472,8 @@ function normalizeRecommendationGroups(groups, kind) {
   return displayGroups;
 }
 
+// Crea il bottone di un singolo consiglio.
+// Il click apre il dettaglio interno prima di navigare alla pagina prodotto.
 function createRecommendationButton(product, kind) {
   const button = document.createElement("button");
   button.className = "recommendation-item";
@@ -472,6 +510,8 @@ function createRecommendationButton(product, kind) {
   return button;
 }
 
+// Mostra il dettaglio di un consiglio selezionato.
+// Include immagine, metadati, motivazione e bottone di apertura pagina.
 function renderRecommendationDetail(product, kind) {
   const detail = document.getElementById("recommendationDetail");
   if (!detail) {
@@ -565,6 +605,8 @@ function recommendationMeta(product, kind) {
   ].filter(Boolean).join(" - ");
 }
 
+// Determina la URL finale del consiglio.
+// Amazon usa product_url reale, locale usa page_url o costruisce product.html?id=...
 function recommendationUrl(product, kind) {
   if (kind === "amazon") {
     return product.product_url;
@@ -572,6 +614,8 @@ function recommendationUrl(product, kind) {
   return product.page_url || `${LOCAL_PRODUCT_URL}?id=${encodeURIComponent(product.item_id)}`;
 }
 
+// Apre la URL del consiglio nella tab corrente quando possibile.
+// In fallback apre una nuova finestra e mantiene noopener/noreferrer.
 function openRecommendationUrl(url) {
   if (!url) {
     return;
@@ -584,6 +628,8 @@ function openRecommendationUrl(url) {
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
+// Crea gruppi Amazon quando il backend non e disponibile.
+// Usa solo candidati reali gia presenti nel DOM e preserva source_role.
 function buildAmazonFallbackGroups(candidates, limit) {
   const labels = {
     similar: "Prodotti simili su Amazon",
@@ -613,6 +659,8 @@ function buildAmazonFallbackGroups(candidates, limit) {
     .filter((group) => group.products.length);
 }
 
+// Crea immagine prodotto per popup e consigli.
+// Usa placeholder locale se l'immagine manca o genera errore.
 function createProductImage(product, className) {
   const wrapper = document.createElement("div");
   wrapper.className = className;

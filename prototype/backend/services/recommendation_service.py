@@ -17,6 +17,9 @@ from prototype.backend.schemas import (
     RecommendationProduct,
 )
 from prototype.backend.services.discovery_service import call_gemini
+
+# Servizio di raccomandazione contestuale del prototipo.
+# Costruisce gruppi locali per pagine prodotto e organizza candidati Amazon gia letti dal DOM.
 try:
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.metrics.pairwise import cosine_similarity
@@ -28,9 +31,10 @@ except ImportError:
 logger=logging.getLogger(__name__)
 DEFAULT_GROUP_LIMIT=4
 LOCAL_PRODUCT_BASE_URL="http://localhost:3000/product.html"
-DEFAULT_GEMINI_MODEL_NAME="Gemini"
 
 
+# Candidato locale con score intermedi per ranking e raggruppamento.
+# La dataclass evita dizionari opachi durante la composizione dei consigli.
 @dataclass
 class LocalCandidate:
     product: Product
@@ -43,11 +47,15 @@ class LocalCandidate:
     brand: str | None
 
 
+# Restituisce la baseline Popular del catalogo locale.
+# Viene usata da backend, home cold-start e fallback del popup.
 def popular_products(products: list[Product],limit: int=10) -> list[Product]:
     ordered=sorted(products,key=lambda product: _safe_float(product.popularity_score),reverse=True)
     return ordered[:max(1,limit)]
 
 
+# Crea raccomandazioni contestuali per una pagina prodotto locale.
+# I prodotti arrivano solo dal catalogo demo; Gemini puo rifinire testi, non scegliere item.
 def contextual_recommendations(
     products: list[Product],
     item_id: str,
@@ -84,6 +92,8 @@ def contextual_recommendations(
     return response
 
 
+# Organizza candidati Amazon reali gia estratti dalla pagina corrente.
+# Il backend non naviga Amazon e non inventa link: lavora solo sui candidati ricevuti.
 def organize_amazon_recommendations(
     product: AmazonPageProduct,
     candidates: list[AmazonRecommendationCandidate],

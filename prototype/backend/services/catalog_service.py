@@ -5,12 +5,18 @@ from pathlib import Path
 from prototype.backend.schemas import Product
 
 
+# Servizio catalogo del backend.
+# Carica products_demo.json, normalizza valori mancanti e offre accesso per id o lista.
 class CatalogService:
+    # Inizializza il catalogo una volta all'avvio dell'app.
+    # L'indice _by_id evita ricerche lineari quando il frontend chiede un dettaglio prodotto.
     def __init__(self,data_path: Path):
         self.data_path=data_path
         self._products=self._load_products()
         self._by_id={product.item_id: product for product in self._products}
 
+    # Legge il JSON demo e lo converte in oggetti Product validati.
+    # I prodotti senza prezzo vengono esclusi per mantenere una demo e-commerce concreta.
     def _load_products(self) -> list[Product]:
         if not self.data_path.exists():
             return []
@@ -22,21 +28,31 @@ class CatalogService:
         products=[product for product in products if self._has_price(product)]
         return sorted(products,key=lambda item: item.popularity_score,reverse=True)
 
+    # Recupera un prodotto specifico per item_id.
+    # Restituisce None se l'id non esiste, lasciando all'endpoint la scelta del 404.
     def get_product(self,item_id: str) -> Product | None:
         return self._by_id.get(item_id)
 
+    # Restituisce una copia della lista prodotti.
+    # Evita che i servizi chiamanti modifichino accidentalmente la cache interna.
     def all_products(self) -> list[Product]:
         return list(self._products)
 
+    # Applica la pulizia a tutti i campi grezzi della riga JSON.
+    # Il metodo resta separato per rendere chiaro il confine tra input sporco e schema Product.
     def _clean_row(self,row: dict) -> dict:
         return {key:self._clean_value(value) for key,value in row.items()}
 
+    # Converte NaN float in None.
+    # Pydantic e JSON gestiscono meglio None rispetto a NaN non serializzabili.
     @staticmethod
     def _clean_value(value):
         if isinstance(value,float) and math.isnan(value):
             return None
         return value
 
+    # Verifica che il prodotto abbia un prezzo positivo.
+    # La demo mostra solo articoli acquistabili o confrontabili sul prezzo.
     @staticmethod
     def _has_price(product: Product) -> bool:
         return product.price is not None and product.price > 0

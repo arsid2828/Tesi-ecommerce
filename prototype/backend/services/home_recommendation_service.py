@@ -11,21 +11,31 @@ from prototype.backend.schemas import (
 from prototype.backend.services.recommendation_service import popular_products
 
 
+# Servizio delle due home dimostrative.
+# Legge profili e ranking pre-esportati senza caricare matrici recommender durante la demo.
 class HomeRecommendationService:
+    # Carica il file home_profiles.json e crea indice per profile_id.
+    # Il backend puo cosi rispondere velocemente a cold-start e utente storico.
     def __init__(self,profiles_path: Path):
         self.profiles_path=profiles_path
         self._rows=self._load_rows()
         self._by_id={str(row["profile_id"]):row for row in self._rows}
 
+    # Legge il payload JSON dei profili home.
+    # Se il file manca restituisce lista vuota e gli endpoint gestiscono il caso senza crash.
     def _load_rows(self) -> list[dict[str,Any]]:
         if not self.profiles_path.exists():
             return []
         payload=json.loads(self.profiles_path.read_text(encoding="utf-8"))
         return list(payload.get("profiles",[]))
 
+    # Restituisce i profili disponibili alla UI.
+    # Sono validati dallo schema HomeProfile prima di arrivare al frontend.
     def profiles(self) -> list[HomeProfile]:
         return [HomeProfile(**row) for row in self._rows]
 
+    # Costruisce le raccomandazioni della home selezionata.
+    # Cold-start usa Popular, mentre il profilo dataset usa ranking ibrido esportato.
     def recommendations(
         self,
         profile_id: str,
@@ -44,6 +54,8 @@ class HomeRecommendationService:
             ranked=self._hybrid_recommendations(row,products,safe_limit)
         return HomeRecommendationsResponse(profile=profile,products=ranked)
 
+    # Genera prodotti home per il profilo senza storico.
+    # Ogni item riceve rank, score e motivazione della baseline Popular.
     @staticmethod
     def _popular_recommendations(
         products: list[Product],
@@ -62,6 +74,8 @@ class HomeRecommendationService:
             for rank,product in enumerate(ranked,start=1)
         ]
 
+    # Genera prodotti home per l'utente storico.
+    # Incrocia item_id raccomandati con il catalogo demo filtrato e acquistabile.
     @staticmethod
     def _hybrid_recommendations(
         profile_row: dict[str,Any],
@@ -92,6 +106,8 @@ class HomeRecommendationService:
                 break
         return ranked
 
+    # Converte un Product in dizionario compatibile con Pydantic v1/v2.
+    # Serve a creare modelli estesi senza dipendere dalla versione installata.
     @staticmethod
     def _product_data(product: Product) -> dict[str,Any]:
         if hasattr(product,"model_dump"):

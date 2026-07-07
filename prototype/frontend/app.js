@@ -1,3 +1,5 @@
+// Frontend vanilla del prototipo StoreLab.
+// Gestisce home, ricerca a cluster/lista e pagina dettaglio parlando con il backend FastAPI.
 const BASE_API_URL = "http://localhost:8000";
 
 const state = {
@@ -17,6 +19,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
+// Inizializza la home e seleziona il profilo richiesto dall'URL.
+// Dopo aver letto i profili dal backend carica il ranking home e ripristina eventuale ricerca.
 async function initHomePage() {
   setupProfileSwitcher();
   setupDiscoveryControls();
@@ -34,6 +38,8 @@ async function initHomePage() {
   runInitialSearchFromUrl();
 }
 
+// Collega i bottoni profilo della home.
+// Ogni cambio aggiorna stato, UI e raccomandazioni senza ricaricare la pagina.
 function setupProfileSwitcher() {
   document.querySelectorAll(".profile-option").forEach((button) => {
     button.addEventListener("click", () => {
@@ -48,6 +54,8 @@ function setupProfileSwitcher() {
   });
 }
 
+// Collega form ricerca, cambio modalita e bottone di pulizia.
+// La ricerca puo produrre cluster discovery o lista ordinata tradizionale.
 function setupDiscoveryControls() {
   const form = document.getElementById("discoveryForm");
   const mode = document.getElementById("resultMode");
@@ -60,12 +68,16 @@ function setupDiscoveryControls() {
   updateSearchModeControls();
 }
 
+// Mostra i controlli coerenti con la modalita scelta.
+// In vista ordinata nasconde il prompt Gemini e mostra il criterio di sort.
 function updateSearchModeControls() {
   const isSorted = document.getElementById("resultMode").value === "sorted";
   document.getElementById("aiQueryField").classList.toggle("hidden", isSorted);
   document.getElementById("sortField").classList.toggle("hidden", !isSorted);
 }
 
+// Ripristina una ricerca salvata nei parametri URL.
+// Permette di tornare dal dettaglio prodotto mantenendo query, vista e ordinamento.
 function runInitialSearchFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const query = params.get("q");
@@ -83,6 +95,8 @@ function runInitialSearchFromUrl() {
   runCatalogSearch();
 }
 
+// Esegue la ricerca catalogo dalla barra sticky.
+// Chiama /discover per cluster a ruoli oppure /search per risultati ordinabili lato client.
 async function runCatalogSearch() {
   const query = document.getElementById("searchInput").value.trim();
   if (!query) {
@@ -147,6 +161,8 @@ function renderSearchLoading(query, aiQuery, mode) {
   renderMessage("searchResultsContent", "Caricamento risultati...");
 }
 
+// Disegna la risposta discovery a gruppi.
+// Mostra fonte del supporto AI, sintesi e numero di candidati recuperati.
 function renderClusterSearch(response) {
   const groups = response.groups || [];
   document.getElementById("searchResultsKicker").textContent = response.used_ai_support
@@ -158,6 +174,8 @@ function renderClusterSearch(response) {
   renderSearchRoleGroups(groups);
 }
 
+// Renderizza i cluster di ricerca come sezioni prodotto.
+// Ogni gruppo contiene parole chiave, motivazione e card con evidenze locali.
 function renderSearchRoleGroups(groups) {
   const container = document.getElementById("searchResultsContent");
   container.className = "role-results search-role-results";
@@ -227,6 +245,8 @@ function formatProductCount(value) {
   return `${count} ${count === 1 ? "prodotto" : "prodotti"}`;
 }
 
+// Renderizza la vista lista ordinata della ricerca.
+// I prodotti vengono ordinati nel browser per prezzo, rating o numero recensioni.
 function renderSortedSearch(query, products, sortBy) {
   const sorted = sortSearchProducts(products, sortBy);
   document.getElementById("searchResultsKicker").textContent = "Vista ordinata";
@@ -243,6 +263,8 @@ function renderSortedSearch(query, products, sortBy) {
   sorted.forEach((product) => container.appendChild(createProductCard(product)));
 }
 
+// Ordina i risultati della ricerca con fallback di popolarita.
+// Mantiene ordinamenti stabili e leggibili anche quando prezzo o rating mancano.
 function sortSearchProducts(products, sortBy) {
   const sorted = [...products];
   const popularityTieBreak = (a, b) => Number(b.popularity_score || 0) - Number(a.popularity_score || 0);
@@ -279,6 +301,8 @@ function renderSearchMessage(message) {
   renderMessage("searchResultsContent", message);
 }
 
+// Chiude la sezione risultati e ripristina la home.
+// Pulisce input e parametri URL per tornare allo stato iniziale.
 function clearSearchResults() {
   state.searchRequestId += 1;
   setSearchLoading(false);
@@ -319,6 +343,8 @@ function updateSearchUrl(query, mode, sortBy, aiQuery) {
   window.history.replaceState({}, "", url);
 }
 
+// Aggiorna le label dei bottoni profilo con i dati reali del backend.
+// Mantiene l'HTML statico leggero e lascia ai dati JSON la descrizione corrente.
 function updateProfileSwitcher(profiles) {
   profiles.forEach((profile) => {
     const button = document.querySelector(`[data-profile-id="${profile.profile_id}"]`);
@@ -342,6 +368,8 @@ function setActiveProfileButton(profileId) {
   });
 }
 
+// Carica il ranking home per un profilo.
+// Usa un request id per ignorare risposte vecchie se l'utente cambia profilo velocemente.
 async function loadHomeRecommendations(profileId) {
   const requestId = ++state.homeRequestId;
   setProfileLoading(true);
@@ -373,6 +401,8 @@ function setProfileLoading(isLoading) {
   document.body.classList.toggle("is-loading-profile", isLoading);
 }
 
+// Disegna hero, card algoritmo e griglie prodotto della home.
+// Cambia testi e sezioni in base a cold-start o utente storico.
 function renderHome(response) {
   const profile = response.profile;
   const products = response.products || [];
@@ -405,6 +435,8 @@ function renderHome(response) {
   document.getElementById("secondarySection").classList.toggle("hidden", products.length <= 8);
 }
 
+// Mostra chip sintetiche sul profilo selezionato.
+// Per il cold-start comunica assenza di storico, per il dataset riassume utente e interessi.
 function renderProfileFacts(profile) {
   const container = document.getElementById("profileFacts");
   container.innerHTML = "";
@@ -431,6 +463,8 @@ function shortDatasetUserId(value) {
   return `${id.slice(0, 7)}…${id.slice(-5)}`;
 }
 
+// Renderizza modello attivo, pesi e metrica di validazione.
+// La card rende trasparente perche la home usa Popular o ibrido.
 function renderAlgorithmCard(algorithm) {
   const card = document.getElementById("algorithmCard");
   const weights = Object.entries(algorithm.weights || {})
@@ -458,6 +492,8 @@ function weightLabel(name) {
   return labels[name] || name;
 }
 
+// Popola una griglia prodotto della home.
+// Se non ci sono prodotti mostra uno stato vuoto leggibile.
 function renderProductGrid(containerId, products) {
   const container = document.getElementById(containerId);
   container.innerHTML = "";
@@ -470,6 +506,8 @@ function renderProductGrid(containerId, products) {
   });
 }
 
+// Inizializza la pagina dettaglio prodotto.
+// Recupera id e profilo dall'URL, poi carica dettaglio e consigli contestuali in parallelo.
 async function initProductPage() {
   const params = new URLSearchParams(window.location.search);
   const itemId = params.get("id");
@@ -496,6 +534,8 @@ async function initProductPage() {
   ]);
 }
 
+// Helper GET verso il backend FastAPI.
+// Centralizza gestione status HTTP e parsing JSON.
 async function fetchJson(path) {
   const response = await fetch(`${BASE_API_URL}${path}`);
   if (!response.ok) {
@@ -504,6 +544,8 @@ async function fetchJson(path) {
   return response.json();
 }
 
+// Helper POST JSON verso il backend FastAPI.
+// Usato dalla discovery a ruoli che invia query e richiesta opzionale a Gemini.
 async function postJson(path, body) {
   const response = await fetch(`${BASE_API_URL}${path}`, {
     method: "POST",
@@ -516,6 +558,8 @@ async function postJson(path, body) {
   return response.json();
 }
 
+// Carica il dettaglio prodotto per item_id.
+// In caso di errore mostra un messaggio invece di lasciare la pagina vuota.
 async function loadProductDetail(itemId) {
   try {
     const product = await fetchJson(`/products/${encodeURIComponent(itemId)}`);
@@ -526,6 +570,8 @@ async function loadProductDetail(itemId) {
   }
 }
 
+// Carica raccomandazioni contestuali per la pagina prodotto.
+// La pagina locale usa supporto AI disattivato per mostrare il ranking locale puro.
 async function loadProductRecommendations(itemId) {
   try {
     const response = await fetchJson(
@@ -539,6 +585,8 @@ async function loadProductRecommendations(itemId) {
   }
 }
 
+// Renderizza gruppi contestuali del dettaglio prodotto.
+// Somma i suggerimenti e crea sezioni per simili, alternative e complementari.
 function renderProductRecommendations(response) {
   const groups = response.groups || [];
   const container = document.getElementById("productRecommendationGroups");
@@ -583,6 +631,8 @@ function renderProductRecommendations(response) {
   });
 }
 
+// Crea una card prodotto riutilizzata da home, ricerca e consigli.
+// Le opzioni decidono se mostrare rank, motivazioni di ruolo o evidenze locali.
 function createProductCard(product, options = {}) {
   const card = document.createElement("article");
   card.className = "product-card";
@@ -652,6 +702,8 @@ function createProductCard(product, options = {}) {
   return card;
 }
 
+// Crea il blocco evidenze per le card discovery.
+// Mostra fonti locali e fino a due snippet QA/recensioni/metadati.
 function createEvidenceBlock(product) {
   const wrapper = document.createElement("div");
   wrapper.className = "evidence-preview";
@@ -675,6 +727,8 @@ function createEvidenceBlock(product) {
   return wrapper;
 }
 
+// Disegna il dettaglio principale del prodotto.
+// Include immagine, categoria, descrizione, prezzo, rating e numero recensioni.
 function renderProductDetail(product) {
   const container = document.getElementById("productDetail");
   container.innerHTML = "";
@@ -697,6 +751,8 @@ function renderProductDetail(product) {
   container.appendChild(info);
 }
 
+// Crea il contenitore immagine per card e dettaglio.
+// Se l'immagine manca o fallisce, passa al placeholder testuale.
 function createImageBox(product, className) {
   const wrapper = document.createElement("div");
   wrapper.className = className;
@@ -729,6 +785,8 @@ function createPlaceholder() {
   return placeholder;
 }
 
+// Mostra uno stato testuale dentro un contenitore.
+// Usa escape HTML per evitare markup imprevisto nei messaggi.
 function renderMessage(containerId, message) {
   const container = document.getElementById(containerId);
   container.innerHTML = `<p class="empty-state">${escapeHtml(message)}</p>`;
@@ -759,6 +817,8 @@ function priceClassName(value) {
   return normalizePrice(value) === null ? "price-row muted-price" : "price-row";
 }
 
+// Escapa testo prima di inserirlo con innerHTML.
+// Protegge card e blocchi dinamici da caratteri interpretati come markup.
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")

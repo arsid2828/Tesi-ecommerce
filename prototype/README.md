@@ -30,7 +30,7 @@ prototype/
     app.js
     style.css
   scripts/
-    export_demo_catalog.py
+    export_home_profiles.py
 ```
 
 ## Configurazione AI opzionale

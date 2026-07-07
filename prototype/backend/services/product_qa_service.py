@@ -7,6 +7,8 @@ from typing import Any
 
 from prototype.backend.schemas import Product,ProductQAEvidence
 
+# Servizio di evidenze locali per discovery e raccomandazioni.
+# Recupera metadati, QA e recensioni da file locali senza chiamare servizi esterni.
 try:
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.metrics.pairwise import cosine_similarity
@@ -26,14 +28,16 @@ MIN_RELEVANT_SCORE=0.04
 
 
 class ProductQAService:
-    #Servizio di retrieval locale per la discovery
-    #Carica QA e recensioni una sola volta, ma non espone piu una chat prodotto
+    # Servizio di retrieval locale per la discovery.
+    # Carica QA e recensioni una sola volta, ma non espone piu una chat prodotto.
     def __init__(self,data_dir: Path):
         self.data_dir=data_dir
         self._qa_by_id=defaultdict(list)
         self._reviews_by_id=defaultdict(list)
         self._load_optional_sources()
 
+    # Restituisce evidenze testuali pertinenti per un prodotto e una query.
+    # Combina metadati sempre disponibili con QA/recensioni se i file esistono.
     def evidence_for_product(
         self,
         product: Product,
@@ -44,6 +48,8 @@ class ProductQAService:
         documents=self._build_documents(product)
         return _retrieve_evidence(clean_query,documents)[:max(0,max_items)]
 
+    # Costruisce documenti recuperabili per un singolo prodotto.
+    # Ogni documento mantiene una source per spiegare alla UI da dove arriva l'evidenza.
     def _build_documents(self,product: Product) -> list[dict[str,str]]:
         documents=[]
         metadata_parts=[
@@ -75,6 +81,8 @@ class ProductQAService:
 
         return [doc for doc in documents if doc["text"].strip()]
 
+    # Carica tutte le sorgenti opzionali supportate.
+    # I parquet processed sono la sorgente principale; i JSON demo restano fallback leggeri.
     def _load_optional_sources(self) -> None:
         self._load_processed_parquet()
         for filename in ["qa_demo.json","product_qa_demo.json"]:
@@ -82,6 +90,8 @@ class ProductQAService:
         for filename in ["reviews_demo.json","product_reviews_demo.json"]:
             self._load_json_reviews(self.data_dir / filename)
 
+    # Carica QA e review dai parquet prodotti nella preparazione dati.
+    # Se pandas o i file non sono disponibili, la demo continua con soli metadati.
     def _load_processed_parquet(self) -> None:
         if pd is None:
             return
@@ -123,6 +133,8 @@ class ProductQAService:
             except Exception as exc:
                 logger.warning("Reviews parquet non caricato: %s",exc)
 
+    # Carica QA opzionali in formato JSON.
+    # Supporta vari nomi campo per riusare piccoli dataset dimostrativi.
     def _load_json_qa(self,path: Path) -> None:
         if not path.exists():
             return
@@ -141,6 +153,8 @@ class ProductQAService:
         except Exception as exc:
             logger.warning("QA JSON non caricato da %s: %s",path,exc)
 
+    # Carica recensioni opzionali in formato JSON.
+    # I record vengono indicizzati per item_id e usati solo come evidenze locali.
     def _load_json_reviews(self,path: Path) -> None:
         if not path.exists():
             return
@@ -161,6 +175,8 @@ class ProductQAService:
             logger.warning("Reviews JSON non caricato da %s: %s",path,exc)
 
 
+# Recupera le evidenze piu pertinenti tra i documenti disponibili.
+# Usa TF-IDF quando possibile e fallback overlap se scikit-learn non e installato.
 def _retrieve_evidence(question: str,documents: list[dict[str,str]]) -> list[ProductQAEvidence]:
     if not question.strip() or not documents:
         return []

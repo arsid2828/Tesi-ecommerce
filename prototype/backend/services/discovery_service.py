@@ -11,6 +11,8 @@ from typing import Any
 from prototype.backend.schemas import DiscoveryEvidence,DiscoveryProduct,DiscoveryRoleGroup,DiscoverySearchResponse,Product
 from prototype.backend.services.search_service import search_products
 
+# Servizio di product discovery a ruoli.
+# Recupera candidati localmente, aggiunge evidenze e usa Gemini solo per rifinire il copy.
 try:
     from google import genai
     from google.genai import types
@@ -26,11 +28,15 @@ MAX_AI_TITLES_PER_GROUP=4
 DEFAULT_GEMINI_MODEL="gemini-2.5-flash"
 
 
+# Restituisce i prodotti piu popolari del catalogo.
+# Serve come fallback quando la query non produce candidati sufficienti.
 def most_popular(products: list[Product],limit: int=10) -> list[Product]:
     ordered=sorted(products,key=lambda product: product.popularity_score,reverse=True)
     return ordered[:limit]
 
 
+# Chiama Gemini con output JSON per rifinire testi dei cluster.
+# La funzione carica le variabili ambiente locali e fallisce se la chiave non esiste.
 def call_gemini(prompt: str) -> str:
     if genai is None:
         raise RuntimeError("Libreria google-genai non installata.")
@@ -73,6 +79,8 @@ def _load_env_files() -> None:
                 os.environ[key]=value
 
 
+# Candidato discovery con score e fonti gia calcolati.
+# Tiene insieme prodotto, ranking locale, marca stimata ed evidenze mostrate in UI.
 @dataclass
 class ScoredProduct:
     product: Product
@@ -85,6 +93,8 @@ class ScoredProduct:
     evidence_sources: list[str]
 
 
+# Punto di ingresso della discovery AI-first.
+# La scelta dei prodotti resta locale; Gemini, se attivo, puo solo riorganizzare testi e gruppi.
 def discover_products(
     products: list[Product],
     query: str,
@@ -165,7 +175,7 @@ def _collect_candidates(
     else:
         add_many(most_popular(products,limit=min(limit,40)))
 
-    complement_terms=_complement_terms(_tokens(query),[])
+    complement_terms=_complement_terms(_tokens(query))
     for term in complement_terms[:8]:
         add_many(search_products(products,term,limit=12))
 
@@ -339,7 +349,7 @@ def _complementary_group(
     query_terms: list[str],
     evidence_service: Any,
 ) -> DiscoveryRoleGroup | None:
-    complement_terms=_complement_terms(_tokens(query),[item.product for item in already_scored[:3]])
+    complement_terms=_complement_terms(_tokens(query))
     if not complement_terms:
         return None
 
@@ -579,7 +589,7 @@ def _primary_terms(query: str) -> list[str]:
     return _dedupe(terms)
 
 
-def _complement_terms(query_terms: list[str],products: list[Product]) -> list[str]:
+def _complement_terms(query_terms: list[str]) -> list[str]:
     joined=" ".join(query_terms).lower()
     complement_map={
         "mouse": ["keyboard","headset","mouse pad"],
