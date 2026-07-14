@@ -1,4 +1,4 @@
-// Frontend vanilla del prototipo StoreLab.
+// Frontend vanilla del prototipo e-commerce.
 // Gestisce home, ricerca a cluster/lista e pagina dettaglio parlando con il backend FastAPI.
 const BASE_API_URL = "http://localhost:8000";
 
