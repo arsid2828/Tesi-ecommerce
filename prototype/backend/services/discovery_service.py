@@ -11,8 +11,8 @@ from typing import Any
 from prototype.backend.schemas import DiscoveryEvidence,DiscoveryProduct,DiscoveryRoleGroup,DiscoverySearchResponse,Product
 from prototype.backend.services.search_service import search_products
 
-# Servizio di product discovery a ruoli.
-# Recupera candidati localmente, aggiunge evidenze e usa Gemini solo per rifinire il copy.
+# Servizio di product discovery a cluster.
+# Recupera candidati ed evidenze localmente; Gemini puo creare i cluster solo con questi prodotti.
 try:
     from google import genai
     from google.genai import types
@@ -24,7 +24,8 @@ except ImportError:
 logger=logging.getLogger(__name__)
 MAX_GROUP_PRODUCTS=4
 MAX_EVIDENCE_PER_PRODUCT=3
-MAX_AI_TITLES_PER_GROUP=4
+MAX_AI_CANDIDATES=24
+MAX_AI_GROUPS=6
 DEFAULT_GEMINI_MODEL="gemini-2.5-flash"
 
 
@@ -35,7 +36,7 @@ def most_popular(products: list[Product],limit: int=10) -> list[Product]:
     return ordered[:limit]
 
 
-# Chiama Gemini con output JSON per rifinire testi dei cluster.
+# Chiama Gemini con output JSON per creare i cluster del sito.
 # La funzione carica le variabili ambiente locali e fallisce se la chiave non esiste.
 def call_gemini(prompt: str) -> str:
     if genai is None:
@@ -93,8 +94,8 @@ class ScoredProduct:
     evidence_sources: list[str]
 
 
-# Punto di ingresso della discovery AI-first.
-# La scelta dei prodotti resta locale; Gemini, se attivo, puo solo riorganizzare testi e gruppi.
+# Punto di ingresso della discovery AI-first usata dal sito.
+# I candidati restano locali; Gemini, se attivo, decide cluster e appartenenze usando i loro item_id.
 def discover_products(
     products: list[Product],
     query: str,
@@ -124,32 +125,45 @@ def discover_products(
     ]
     scored.sort(key=lambda item:(-item.quality_score,item.product.item_id))
 
-    groups=_build_role_groups(
+    base_response=DiscoverySearchResponse(
+        query=clean_query,
+        ai_query=clean_ai_query,
+        answer="",
+        total_candidates=len(candidates),
+        groups=[],
+        source_summary={},
+        used_ai_support=False,
+        fallback=not bool(clean_query.strip()),
+    )
+
+    if use_ai_support and scored:
+        try:
+            return _build_ai_groups(
+                response=base_response,
+                scored=scored,
+                query_terms=query_terms,
+            )
+        except Exception as exc:
+            logger.warning("Fallback discovery con cluster locali: %s",exc)
+
+    fallback_groups=_build_role_groups(
         all_products=products,
         scored=scored,
         query=intent_query,
         query_terms=query_terms,
         evidence_service=evidence_service,
     )
-    source_summary=_source_summary(groups)
-    answer=_local_answer(intent_query,groups,source_summary)
-    response=DiscoverySearchResponse(
+    source_summary=_source_summary(fallback_groups)
+    return DiscoverySearchResponse(
         query=clean_query,
         ai_query=clean_ai_query,
-        answer=answer,
+        answer=_local_answer(intent_query,fallback_groups,source_summary),
         total_candidates=len(candidates),
-        groups=groups,
+        groups=fallback_groups,
         source_summary=source_summary,
         used_ai_support=False,
         fallback=not bool(clean_query.strip()),
     )
-
-    if use_ai_support and groups:
-        try:
-            return _apply_ai_support(response)
-        except Exception as exc:
-            logger.warning("Fallback discovery copy locale: %s",exc)
-    return response
 
 
 def _collect_candidates(
@@ -639,107 +653,140 @@ def _local_answer(
     )
 
 
-def _apply_ai_support(response: DiscoverySearchResponse) -> DiscoverySearchResponse:
+def _build_ai_groups(
+    response: DiscoverySearchResponse,
+    scored: list[ScoredProduct],
+    query_terms: list[str],
+) -> DiscoverySearchResponse:
+    candidate_pool=_ai_candidate_pool(scored)
     payload={
         "catalog_query": response.query,
-        "user_request_for_gemini": response.ai_query,
-        "source_summary": response.source_summary,
-        "groups": [
+        "user_grouping_request": response.ai_query,
+        "constraints": {
+            "min_groups": 2,
+            "max_groups": MAX_AI_GROUPS,
+            "max_products_per_group": MAX_GROUP_PRODUCTS,
+        },
+        "candidates": [
             {
-                "role_id": group.role_id,
-                "label": group.label,
-                "description": group.description,
-                "keywords": group.keywords,
-                "sources": sorted({source for product in group.products for source in product.evidence_sources}),
-                "products": [
+                "item_id": item.product.item_id,
+                "title": _short_text(item.product.title,max_chars=140),
+                "category": _short_text(item.product.category,max_chars=80),
+                "description": _short_text(item.product.description,max_chars=220),
+                "price": item.product.price,
+                "average_rating": item.product.average_rating,
+                "rating_count": item.product.rating_count,
+                "popularity_score": item.product.popularity_score,
+                "local_match_score": item.match_score,
+                "local_evidence": [
                     {
-                        "title": _short_text(product.title,max_chars=120),
-                        "local_reason": _short_text(product.role_reason,max_chars=220),
-                        "local_evidence": [
-                            {
-                                "source": evidence.source_label,
-                                "text": _short_text(evidence.text,max_chars=260),
-                            }
-                            for evidence in product.evidence[:2]
-                        ],
+                        "source": evidence.source_label,
+                        "text": _short_text(evidence.text,max_chars=260),
                     }
-                    for product in group.products[:MAX_AI_TITLES_PER_GROUP]
+                    for evidence in item.evidence[:2]
                 ],
             }
-            for group in response.groups
+            for item in candidate_pool
         ],
     }
     prompt=(
-        "Sei un copy assistant per una demo di product discovery e-commerce. "
-        "Ricevi una query catalogo, una richiesta testuale opzionale e cluster con evidenze locali. "
-        "Puoi riordinare i gruppi e riscrivere answer,label,description e reason per rispondere meglio alla richiesta. "
-        "Non puoi cambiare ruolo o prodotti dentro i gruppi, alterare fonti o inventare caratteristiche. "
-        "Usa esclusivamente le evidenze locali incluse nel payload. "
+        "Sei il motore di clustering di una demo di product discovery e-commerce. "
+        "Ricevi una query catalogo, un criterio opzionale dell'utente e candidati recuperati localmente. "
+        "Crea da zero cluster utili e specifici per la richiesta: non partire da ruoli predefiniti. "
+        "Scegli il numero, i nomi e le appartenenze in base alle differenze realmente visibili nei dati. "
+        "Usa da 2 a 6 cluster, massimo 4 prodotti per cluster e non ripetere lo stesso item_id. "
+        "Ogni gruppo deve contenere almeno un item_id presente nei candidati; non inventare prodotti, "
+        "caratteristiche, prezzi, fonti o item_id. Se un criterio non e supportato dai dati, non usarlo. "
+        "Scrivi answer, label, description e reason in italiano. "
         "Restituisci solo JSON valido senza Markdown. "
-        'Schema: {"answer":"...","groups":[{"role_id":"...","label":"...","description":"...","reason":"..."}]}. '
+        'Schema: {"answer":"...","groups":[{"cluster_id":"...","label":"...",'
+        '"description":"...","reason":"...","item_ids":["..."]}]}. '
         "Answer massimo 2 frasi; description e reason massimo 1 frase.\n\n"
         f"Dati:\n{json.dumps(payload,ensure_ascii=False)}"
     )
     raw_response=call_gemini(prompt)
     data=_parse_json_object(raw_response)
-    answer=_short_text(data.get("answer"),max_chars=420) or response.answer
+    answer=_short_text(data.get("answer"),max_chars=420)
     raw_groups=data.get("groups")
     if not isinstance(raw_groups,list):
         raise ValueError("Campo groups mancante.")
 
-    updates={}
-    requested_order=[]
-    valid_ids={group.role_id for group in response.groups}
-    for item in raw_groups:
+    scored_by_id={item.product.item_id:item for item in candidate_pool}
+    assigned_ids=set()
+    used_role_ids=set()
+    groups=[]
+    for index,item in enumerate(raw_groups[:MAX_AI_GROUPS],start=1):
         if not isinstance(item,dict):
             continue
-        role_id=str(item.get("role_id") or "")
-        if role_id not in valid_ids:
-            continue
-        if role_id not in requested_order:
-            requested_order.append(role_id)
         label=_short_text(item.get("label"),max_chars=80)
         description=_short_text(item.get("description"),max_chars=180)
         reason=_short_text(item.get("reason"),max_chars=180)
-        if label and description:
-            updates[role_id]={"label": label,"description": description,"reason": reason}
-
-    if not updates and not answer:
-        raise ValueError("Nessun aggiornamento AI valido.")
-
-    groups=[]
-    groups_by_id={group.role_id:group for group in response.groups}
-    ordered_role_ids=requested_order + [
-        group.role_id for group in response.groups if group.role_id not in requested_order
-    ]
-    for role_id in ordered_role_ids:
-        group=groups_by_id[role_id]
-        update=updates.get(group.role_id)
-        if not update:
-            groups.append(group)
+        raw_item_ids=item.get("item_ids")
+        if not label or not description or not isinstance(raw_item_ids,list):
             continue
+        selected=[]
+        for raw_item_id in raw_item_ids:
+            item_id=str(raw_item_id or "")
+            if item_id not in scored_by_id or item_id in assigned_ids:
+                continue
+            selected.append(scored_by_id[item_id])
+            assigned_ids.add(item_id)
+            if len(selected) >= MAX_GROUP_PRODUCTS:
+                break
+        if not selected:
+            continue
+        role_id=_unique_role_id(
+            item.get("cluster_id") or label,
+            index=index,
+            used=used_role_ids,
+        )
+        used_role_ids.add(role_id)
         groups.append(
-            DiscoveryRoleGroup(
-                role_id=group.role_id,
-                label=update["label"],
-                description=update["description"],
-                size=group.size,
-                keywords=group.keywords,
-                products=group.products,
-                reason=update["reason"] or group.reason,
+            _group_from_scored(
+                role_id=role_id,
+                label=label,
+                description=description,
+                scored_items=selected,
+                query_terms=query_terms,
+                role_reason=reason or description,
             )
         )
 
+    groups=[group for group in groups if group is not None]
+    if len(groups) < 2:
+        raise ValueError("Gemini non ha restituito almeno due cluster validi.")
+
+    source_summary=_source_summary(groups)
+    if not answer:
+        answer=_local_answer(" ".join([response.query,response.ai_query]).strip(),groups,source_summary)
     return DiscoverySearchResponse(
         query=response.query,
         ai_query=response.ai_query,
         answer=answer,
         total_candidates=response.total_candidates,
         groups=groups,
-        source_summary=response.source_summary,
+        source_summary=source_summary,
         used_ai_support=True,
         fallback=response.fallback,
     )
+
+
+def _ai_candidate_pool(scored: list[ScoredProduct]) -> list[ScoredProduct]:
+    relevant=_relevant_products(scored)
+    ordered=relevant + [item for item in scored if item not in relevant]
+    return ordered[:MAX_AI_CANDIDATES]
+
+
+def _unique_role_id(value: Any,index: int,used: set[str]) -> str:
+    base=re.sub(r"[^a-z0-9]+","_",str(value or "").lower()).strip("_")[:48]
+    if not base:
+        base=f"gemini_cluster_{index}"
+    candidate=base
+    suffix=2
+    while candidate in used:
+        candidate=f"{base[:44]}_{suffix}"
+        suffix+=1
+    return candidate
 
 
 def _source_summary(groups: list[DiscoveryRoleGroup]) -> dict[str,int]:

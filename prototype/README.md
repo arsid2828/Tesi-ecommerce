@@ -44,7 +44,7 @@ GEMINI_API_KEY=your_gemini_api_key_here
 GEMINI_MODEL=gemini-2.5-flash
 ```
 
-La chiave viene letta solo dal backend. Gemini puo rifinire testi, label e descrizioni dei gruppi gia calcolati, ma non sceglie prodotti e non inventa evidenze.
+La chiave viene letta solo dal backend. Nella discovery del sito Gemini crea cluster dinamici e assegna i candidati tramite `item_id`; il backend accetta soltanto prodotti gia recuperati dal catalogo locale e scarta identificativi inventati. Gli endpoint usati dall'estensione non cambiano.
 
 ## Avviare il backend
 
@@ -80,9 +80,9 @@ Le raccomandazioni del profilo storico sono esportate in modo riproducibile dagl
 python prototype/scripts/export_home_profiles.py
 ```
 
-La barra di ricerca resta sticky durante lo scroll ed e disponibile con entrambi i profili. Nella vista a cluster un secondo campo opzionale raccoglie la richiesta in linguaggio naturale per Gemini: il backend recupera e motiva prima prodotti e cluster con evidenze locali, poi Gemini puo riordinare i gruppi e riscriverne la presentazione senza cambiare i prodotti. La query puo anche essere mostrata come lista ordinata per prezzo, rating o numero di recensioni tramite `GET /search`.
+La barra di ricerca resta sticky durante lo scroll ed e disponibile con entrambi i profili. Nella vista a cluster un secondo campo opzionale permette di indicare a Gemini come raggruppare i risultati: il backend recupera candidati ed evidenze locali, poi Gemini decide numero, nomi e appartenenze dei cluster. La query puo anche essere mostrata come lista ordinata per prezzo, rating o numero di recensioni tramite `GET /search`.
 
-## Ricerca AI-first a ruoli (API)
+## Ricerca AI-first a cluster dinamici (API)
 
 L'endpoint di discovery a query resta disponibile per esperimenti e integrazioni, anche se non e piu la vista iniziale del frontend.
 
@@ -106,12 +106,13 @@ Esempio payload:
 Il backend:
 
 - recupera candidati dal catalogo locale con ricerca testuale e sinonimi controllati;
-- costruisce gruppi per ruolo come migliore scelta, economici, compromesso, stessa marca, prodotti complementari e alternative popolari;
+- passa a Gemini un insieme limitato di candidati reali con `item_id`, metadati ed evidenze locali;
+- lascia a Gemini la creazione di 2-6 cluster e l'assegnazione dei prodotti, senza una lista di ruoli predefiniti;
 - motiva ogni prodotto con evidenze locali;
 - indica se le evidenze arrivano da metadati, recensioni o QA storiche;
-- usa Gemini solo dopo il recupero locale per riordinare i gruppi e rifinire il copy, senza permettere all'AI di scegliere prodotti o inventare dati.
+- valida ogni `item_id` restituito da Gemini e scarta duplicati o prodotti estranei al catalogo recuperato.
 
-Se Gemini non e disponibile, la risposta resta completamente locale.
+Se Gemini non e disponibile o restituisce meno di due cluster validi, la risposta usa i precedenti gruppi euristici come fallback locale.
 
 ## Estensione e consigli contestuali
 

@@ -96,7 +96,7 @@ function runInitialSearchFromUrl() {
 }
 
 // Esegue la ricerca catalogo dalla barra sticky.
-// Chiama /discover per cluster a ruoli oppure /search per risultati ordinabili lato client.
+// Chiama /discover per cluster dinamici di Gemini oppure /search per risultati ordinabili lato client.
 async function runCatalogSearch() {
   const query = document.getElementById("searchInput").value.trim();
   if (!query) {
@@ -154,22 +154,24 @@ function renderSearchLoading(query, aiQuery, mode) {
   document.getElementById("clearSearchButton").classList.remove("hidden");
   document.getElementById("searchResultsKicker").textContent = "Ricerca in corso";
   document.getElementById("searchResultsTitle").textContent = `Risultati per “${query}”`;
-  document.getElementById("searchResultsSummary").textContent = mode === "clusters" && aiQuery
-    ? "Recupero evidenze locali, poi Gemini riorganizza la presentazione dei cluster."
+  document.getElementById("searchResultsSummary").textContent = mode === "clusters"
+    ? (aiQuery
+      ? "Recupero i candidati locali, poi Gemini crea i cluster seguendo il criterio indicato."
+      : "Recupero i candidati locali, poi Gemini crea i cluster più utili per la ricerca.")
     : "Sto preparando i prodotti...";
   document.getElementById("searchResultsCount").textContent = "";
   renderMessage("searchResultsContent", "Caricamento risultati...");
 }
 
-// Disegna la risposta discovery a gruppi.
+// Disegna la risposta discovery a cluster dinamici (o gruppi locali di fallback).
 // Mostra fonte del supporto AI, sintesi e numero di candidati recuperati.
 function renderClusterSearch(response) {
   const groups = response.groups || [];
   document.getElementById("searchResultsKicker").textContent = response.used_ai_support
-    ? "Evidenze locali · riorganizzate da Gemini"
-    : "Cluster con evidenze locali";
+    ? "Cluster creati da Gemini · prodotti locali"
+    : "Cluster locali di fallback";
   document.getElementById("searchResultsTitle").textContent = `Risultati per “${response.query}”`;
-  document.getElementById("searchResultsSummary").textContent = response.answer || "Prodotti raggruppati per ruolo.";
+  document.getElementById("searchResultsSummary").textContent = response.answer || "Prodotti raggruppati in cluster.";
   document.getElementById("searchResultsCount").textContent = `${Number(response.total_candidates || 0)} candidati`;
   renderSearchRoleGroups(groups);
 }
@@ -545,7 +547,7 @@ async function fetchJson(path) {
 }
 
 // Helper POST JSON verso il backend FastAPI.
-// Usato dalla discovery a ruoli che invia query e richiesta opzionale a Gemini.
+// Usato dalla discovery a cluster che invia query e criterio opzionale a Gemini.
 async function postJson(path, body) {
   const response = await fetch(`${BASE_API_URL}${path}`, {
     method: "POST",

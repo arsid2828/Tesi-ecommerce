@@ -147,8 +147,8 @@ def amazon_recommendations(request: AmazonRecommendationsRequest) -> AmazonRecom
     )
 
 
-#Ricerca AI-first: query catalogo,richiesta opzionale per Gemini e output a ruoli
-#La scelta prodotti resta locale;Gemini puo riordinare i gruppi e rifinirne il copy
+#Ricerca AI-first del sito: Gemini crea cluster dinamici sui candidati recuperati localmente
+#Se Gemini non e disponibile,il servizio restituisce i gruppi euristici di fallback
 @app.post("/discover",response_model=DiscoverySearchResponse)
 def discover(request: DiscoverySearchRequest) -> DiscoverySearchResponse:
     return discover_products(

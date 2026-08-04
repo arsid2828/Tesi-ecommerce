@@ -90,8 +90,8 @@ class RecommendationProduct(DiscoveryProduct):
     page_url: str | None=None
 
 
-#Gruppo/cluster costruito per ruolo d'acquisto
-#I prodotti sono scelti localmente;Gemini puo riordinare i gruppi e rifinirne il copy
+#Gruppo/cluster della discovery del sito
+#Con Gemini attivo ruolo e appartenenze sono dinamici,ma gli item_id restano candidati locali validati
 class DiscoveryRoleGroup(BaseModel):
     role_id: str
     label: str
