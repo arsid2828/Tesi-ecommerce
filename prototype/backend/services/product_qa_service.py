@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from prototype.backend.schemas import Product,ProductQAEvidence
+from prototype.backend.services.query_utils import expand_query_text
 
 # Servizio di evidenze locali per discovery e raccomandazioni.
 # Recupera metadati, QA e recensioni da file locali senza chiamare servizi esterni.
@@ -182,7 +183,7 @@ def _retrieve_evidence(question: str,documents: list[dict[str,str]]) -> list[Pro
         return []
 
     texts=[doc["text"] for doc in documents]
-    query_text=_expand_question(question)
+    query_text=expand_query_text(question)
     try:
         scores=_tfidf_scores(query_text,texts)
     except Exception as exc:
@@ -283,37 +284,6 @@ def _chunk_text(text: str,max_words: int=85) -> list[str]:
     return chunks
 
 
-def _expand_question(question: str) -> str:
-    tokens=_tokens(question)
-    expansions=[question]
-    synonym_map={
-        "batteria": "battery battery life lasts duration charge",
-        "dura": "lasts duration long life",
-        "durata": "duration battery life",
-        "telefono": "phone cell smartphone",
-        "telefoni": "phone cell smartphone",
-        "fotocamera": "camera photo pictures",
-        "foto": "camera photo pictures",
-        "gaming": "gaming game video games performance",
-        "giochi": "games gaming video games",
-        "compatibile": "compatible compatibility fit works with",
-        "iphone": "iphone ios apple phone",
-        "problemi": "problem issue broken defect negative complaint",
-        "problema": "problem issue broken defect negative complaint",
-        "recensioni": "review reviews rating feedback",
-        "economico": "cheap budget price low cost",
-        "prezzo": "price cost cheap budget",
-        "qualita": "quality good bad",
-        "installare": "install installation setup",
-        "installa": "install installation setup remove replace",
-        "installazione": "install installation setup remove replace",
-        "filtro": "filter water filter replacement",
-        "filtri": "filter water filter replacement",
-    }
-    for token in tokens:
-        if token in synonym_map:
-            expansions.append(synonym_map[token])
-    return " ".join(expansions)
 
 
 def _load_json_records(path: Path) -> list[dict[str,Any]]:
