@@ -424,20 +424,20 @@ function renderRecommendationGroups(groups, kind) {
 }
 
 // Trasforma i gruppi backend nella vista compatta del popup.
-// Deduplica prodotti e separa consigli simili da complementari.
+// Separa simili/alternative da complementari in due blocchi distinti.
 function normalizeRecommendationGroups(groups, kind) {
   const safeGroups = Array.isArray(groups) ? groups : [];
-  const similarProducts = [];
-  const complementaryProducts = [];
-  const seenSimilar = new Set();
-  const seenComplementary = new Set();
+  const similarAlt = [];
+  const complementary = [];
+  const seenSim = new Set();
+  const seenComp = new Set();
 
   safeGroups.forEach((group) => {
     const roleId = group.role_id || "";
     const products = Array.isArray(group.products) ? group.products : [];
-    const isComplementary = roleId === "together" || roleId === "complementary";
-    const target = isComplementary ? complementaryProducts : similarProducts;
-    const seen = isComplementary ? seenComplementary : seenSimilar;
+    const isComplementary = roleId === "complementary" || roleId === "together";
+    const target = isComplementary ? complementary : similarAlt;
+    const seen = isComplementary ? seenComp : seenSim;
     products.forEach((product) => {
       const key = product.item_id || product.asin || product.product_url || product.title;
       if (!key || seen.has(key)) {
@@ -449,24 +449,24 @@ function normalizeRecommendationGroups(groups, kind) {
   });
 
   const displayGroups = [];
-  if (similarProducts.length) {
+  if (similarAlt.length) {
     displayGroups.push({
-      role_id: "best_similar",
-      label: kind === "amazon" ? "Prodotti simili migliori" : "Migliori prodotti simili",
+      role_id: "similar_alternatives",
+      label: kind === "amazon" ? "Simili e alternative reali" : "Simili e alternative",
       description: kind === "amazon"
-        ? "Alternative reali trovate nella pagina, scelte per somiglianza con il prodotto aperto."
-        : "Scelte vicine per categoria, prezzo, qualita locale, popolarita e possibile affidabilita della marca.",
-      products: similarProducts.slice(0, 4),
+        ? "Prodotti simili e alternative reali trovate nella pagina Amazon."
+        : "Prodotti della stessa tipologia e alternative da confrontare.",
+      products: similarAlt.slice(0, 8),
     });
   }
-  if (complementaryProducts.length) {
+  if (complementary.length) {
     displayGroups.push({
       role_id: "complementary",
-      label: "Complementari e utili assieme",
+      label: "Utili insieme",
       description: kind === "amazon"
-        ? "Accessori, servizi o prodotti reali letti nella pagina e collegati all'acquisto principale."
-        : "Prodotti da usare insieme, accessori o alternative di supporto scelte dal catalogo locale.",
-      products: complementaryProducts.slice(0, 4),
+        ? "Accessori e prodotti reali collegati all'acquisto principale."
+        : "Prodotti complementari e accessori da usare insieme.",
+      products: complementary.slice(0, 4),
     });
   }
   return displayGroups;
@@ -629,34 +629,39 @@ function openRecommendationUrl(url) {
 }
 
 // Crea gruppi Amazon quando il backend non e disponibile.
-// Usa solo candidati reali gia presenti nel DOM e preserva source_role.
+// Usa solo candidati reali gia presenti nel DOM, due soli gruppi: simili/alternative e complementari.
 function buildAmazonFallbackGroups(candidates, limit) {
-  const labels = {
-    similar: "Prodotti simili su Amazon",
-    alternatives: "Alternative reali",
-    together: "Spesso acquistati insieme",
-  };
-  const roleMap = {
-    similar: "similar",
-    alternatives: "alternative",
-    together: "together",
-  };
-  return Object.entries(labels)
-    .map(([roleId, label]) => {
-      const products = candidates
-        .filter((candidate) => candidate.source_role === roleMap[roleId])
-        .slice(0, limit)
-        .map((candidate) => ({
-          ...candidate,
-          role_reason: candidate.role_reason || `Prodotto reale letto da ${candidate.source_label || "Amazon"}.`,
-        }));
-      return {
-        role_id: roleId,
-        label,
-        products,
-      };
-    })
-    .filter((group) => group.products.length);
+  const simAltRoles = new Set(["similar", "alternative"]);
+  const simAlt = candidates
+    .filter((candidate) => simAltRoles.has(candidate.source_role))
+    .slice(0, limit * 2)
+    .map((candidate) => ({
+      ...candidate,
+      role_reason: candidate.role_reason || `Prodotto reale letto da ${candidate.source_label || "Amazon"}.`,
+    }));
+  const comp = candidates
+    .filter((candidate) => candidate.source_role === "together")
+    .slice(0, limit)
+    .map((candidate) => ({
+      ...candidate,
+      role_reason: candidate.role_reason || `Prodotto reale letto da ${candidate.source_label || "Amazon"}.`,
+    }));
+  const groups = [];
+  if (simAlt.length) {
+    groups.push({
+      role_id: "similar_alternatives",
+      label: "Simili e alternative reali",
+      products: simAlt,
+    });
+  }
+  if (comp.length) {
+    groups.push({
+      role_id: "complementary",
+      label: "Utili insieme",
+      products: comp,
+    });
+  }
+  return groups;
 }
 
 // Crea immagine prodotto per popup e consigli.

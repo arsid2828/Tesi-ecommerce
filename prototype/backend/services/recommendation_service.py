@@ -251,48 +251,33 @@ def _build_local_groups(
     source_family=_product_family(source)
     same_family=[item for item in scored if source_family and _product_family(item.product) == source_family]
     comparable=same_family if len(same_family) >= limit else scored
-    source_brand=_extract_brand(source.title)
 
-    similar_ranked=sorted(
-        [item for item in comparable if _is_valid_recommendation(source,item,"similar")],
-        key=lambda item: (
-            -(0.54*item.text_score + 0.20*item.quality_score + 0.16*item.price_affinity + 0.10*float(bool(source_brand and item.brand == source_brand))),
+    # Gruppo unico: simili + alternative ordinate per mix di testo, qualita, prezzo e diversita.
+    sim_alt_valid=[
+        item for item in comparable
+        if _is_valid_recommendation(source,item,"similar") or _is_valid_recommendation(source,item,"alternatives")
+    ]
+    sim_alt_ranked=sorted(
+        sim_alt_valid,
+        key=lambda item:(
+            -(0.42*item.text_score + 0.22*item.quality_score + 0.20*item.price_affinity + 0.16*item.diversity_score),
             item.product.item_id,
         ),
     )
-    similar=_take_unique(similar_ranked,seen,limit)
+    sim_alt=_take_unique(sim_alt_ranked,seen,min(limit*2,8))
     groups.append(
         _local_group(
             source=source,
-            role_id="similar",
-            label="Prodotti simili",
-            description="Articoli della stessa tipologia, ordinati per caratteristiche, valutazioni e vicinanza di prezzo.",
-            candidates=similar,
+            role_id="similar_alternatives",
+            label="Simili e alternative",
+            description="Prodotti della stessa tipologia e alternative da confrontare per caratteristiche, prezzo e valutazioni.",
+            candidates=sim_alt,
             evidence_service=evidence_service,
-            reason="Confronto tra tipologia, caratteristiche, prezzo e valutazioni.",
+            reason="Selezione per tipologia, prezzo, valutazioni e varieta di marca.",
         )
     )
 
-    alternative_ranked=sorted(
-        [item for item in comparable if _is_valid_recommendation(source,item,"alternatives")],
-        key=lambda item: (
-            -(0.32*item.diversity_score + 0.28*item.quality_score + 0.25*item.price_affinity + 0.15*item.text_score),
-            item.product.item_id,
-        ),
-    )
-    alternatives=_take_unique(alternative_ranked,seen,limit)
-    groups.append(
-        _local_group(
-            source=source,
-            role_id="alternatives",
-            label="Alternative da confrontare",
-            description="Altre opzioni della stessa tipologia, utili per confrontare marca, prezzo e valutazioni.",
-            candidates=alternatives,
-            evidence_service=evidence_service,
-            reason="Alternative con un buon equilibrio tra prezzo, valutazioni e varietà di marca.",
-        )
-    )
-
+    # Gruppo complementari.
     bundle_ranked=[
         item
         for item in _bundle_candidates(source,all_products,scored)
@@ -302,7 +287,7 @@ def _build_local_groups(
     groups.append(
         _local_group(
             source=source,
-            role_id="together",
+            role_id="complementary",
             label="Utili insieme",
             description="Accessori e prodotti complementari che possono completare l'acquisto.",
             candidates=together,
@@ -398,11 +383,11 @@ def _to_recommendation_product(
 
 
 def _role_score(candidate: LocalCandidate,role_id: str) -> float:
-    if role_id == "similar":
-        return 0.50*candidate.text_score + 0.20*candidate.category_score + 0.18*candidate.quality_score + 0.12*candidate.price_affinity
+    if role_id in {"similar","similar_alternatives"}:
+        return 0.45*candidate.text_score + 0.20*candidate.category_score + 0.20*candidate.quality_score + 0.15*candidate.price_affinity
     if role_id == "alternatives":
         return 0.28*candidate.category_score + 0.22*candidate.quality_score + 0.20*candidate.price_affinity + 0.18*candidate.diversity_score + 0.12*candidate.text_score
-    if role_id == "together":
+    if role_id in {"together","complementary"}:
         return candidate.bundle_score
     return candidate.quality_score
 
@@ -416,9 +401,9 @@ def _local_product_reason(
 ) -> str:
     product=candidate.product
     sources=", ".join(_unique_source_labels(evidence)) or "metadati"
-    if role_id == "similar":
+    if role_id in {"similar","similar_alternatives"}:
         return (
-            f"Stessa tipologia del prodotto aperto, con prezzo {_format_price(product.price)} "
+            f"Stessa tipologia o alternativa confrontabile. Prezzo {_format_price(product.price)} "
             f"e valutazione {_format_rating(product.average_rating)} su 5."
         )
     if role_id == "alternatives":
@@ -427,9 +412,9 @@ def _local_product_reason(
             f"Alternativa {brand_text}, proposta a {_format_price(product.price)} "
             f"con valutazione {_format_rating(product.average_rating)} su 5."
         )
-    if role_id == "together":
+    if role_id in {"together","complementary"}:
         return (
-            f"Può completare l'uso del prodotto aperto. Prezzo {_format_price(product.price)}, "
+            f"Puo completare l'uso del prodotto aperto. Prezzo {_format_price(product.price)}, "
             f"valutazione {_format_rating(product.average_rating)} su 5."
         )
     return f"{group_reason} Fonti: {sources}."
@@ -781,29 +766,26 @@ def _build_amazon_groups(
         return []
     groups=[]
     seen=set()
+    # Due soli gruppi: simili+alternative uniti, complementari separati.
     role_defs=[
         (
-            "similar",
-            "Prodotti simili migliori",
-            "Alternative reali lette nella pagina Amazon e vicine al prodotto aperto.",
-            "similar",
+            "similar_alternatives",
+            "Simili e alternative reali",
+            "Prodotti simili e alternative reali letti nella pagina Amazon.",
+            {"similar","alternative"},
+            min(limit*2,8),
         ),
         (
-            "alternatives",
-            "Altre alternative reali",
-            "Altri prodotti Amazon disponibili tra i suggerimenti visibili nella pagina.",
-            "alternative",
-        ),
-        (
-            "together",
+            "complementary",
             "Complementari e spesso assieme",
             "Accessori, servizi o prodotti reali collegati all'acquisto principale.",
-            "together",
+            {"together"},
+            limit,
         ),
     ]
-    for role_id,label,description,role_key in role_defs:
+    for role_id,label,description,role_keys,max_per_group in role_defs:
         ranked=sorted(
-            [candidate for candidate in candidates if candidate.source_role == role_key],
+            [candidate for candidate in candidates if candidate.source_role in role_keys],
             key=lambda candidate:(-candidate.match_score,candidate.title),
         )
         selected=[]
@@ -813,7 +795,7 @@ def _build_amazon_groups(
                 continue
             selected.append(candidate)
             seen.add(key)
-            if len(selected) >= limit:
+            if len(selected) >= max_per_group:
                 break
         if selected:
             groups.append(
