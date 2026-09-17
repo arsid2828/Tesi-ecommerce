@@ -1,0 +1,110 @@
+{
+  "started_at": "2026-09-17T17:37:17.586004+00:00",
+  "endpoint": "POST /discover",
+  "transport": "FastAPI TestClient, app reale in-process",
+  "limit": 80,
+  "use_ai_support": true,
+  "automatic_retries": 0,
+  "cases": [
+    {
+      "ID": "G01",
+      "query": "mouse",
+      "ai_query": ""
+    },
+    {
+      "ID": "G02",
+      "query": "headphones",
+      "ai_query": ""
+    },
+    {
+      "ID": "G03",
+      "query": "phone",
+      "ai_query": ""
+    },
+    {
+      "ID": "G04",
+      "query": "printer",
+      "ai_query": ""
+    },
+    {
+      "ID": "G05",
+      "query": "drill",
+      "ai_query": ""
+    },
+    {
+      "ID": "G06",
+      "query": "vacuum",
+      "ai_query": ""
+    },
+    {
+      "ID": "G07",
+      "query": "car accessories",
+      "ai_query": ""
+    },
+    {
+      "ID": "G08",
+      "query": "garden tools",
+      "ai_query": ""
+    },
+    {
+      "ID": "G09",
+      "query": "fitness equipment",
+      "ai_query": ""
+    },
+    {
+      "ID": "G10",
+      "query": "board game",
+      "ai_query": ""
+    },
+    {
+      "ID": "C01",
+      "query": "mouse",
+      "ai_query": "raggruppa per utilizzo"
+    },
+    {
+      "ID": "C02",
+      "query": "phone",
+      "ai_query": "raggruppa per fascia di prezzo"
+    },
+    {
+      "ID": "C03",
+      "query": "headphones",
+      "ai_query": "raggruppa per utilizzo"
+    },
+    {
+      "ID": "S01-R2",
+      "query": "mouse",
+      "ai_query": ""
+    },
+    {
+      "ID": "S01-R3",
+      "query": "mouse",
+      "ai_query": ""
+    },
+    {
+      "ID": "S02-R2",
+      "query": "phone",
+      "ai_query": "raggruppa per fascia di prezzo"
+    },
+    {
+      "ID": "S02-R3",
+      "query": "phone",
+      "ai_query": "raggruppa per fascia di prezzo"
+    },
+    {
+      "ID": "S03-R2",
+      "query": "headphones",
+      "ai_query": "raggruppa per utilizzo"
+    },
+    {
+      "ID": "S03-R3",
+      "query": "headphones",
+      "ai_query": "raggruppa per utilizzo"
+    }
+  ],
+  "name_comparison": "Etichette esatte, stesso ordine, senza normalizzazione",
+  "product_comparison": "Insiemi di item_id finali, ordine ignorato",
+  "fallback_comparison": "Incluso e segnalato dagli esiti; non equivale a Gemini",
+  "completed_at": "2026-09-17T17:44:26.505503+00:00",
+  "completed_runs": 19
+}
