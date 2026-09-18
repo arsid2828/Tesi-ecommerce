@@ -1,0 +1,40 @@
+{
+  "created_at": "2026-09-18T08:50:20.256377+00:00",
+  "endpoint": "GET /search",
+  "limit": 80,
+  "transport": "FastAPI TestClient, app reale",
+  "ordering": "Ordine originale del backend, popularity_score decrescente; nessun riordinamento",
+  "cluster_sources": [
+    {
+      "ID": "T01",
+      "query": "mouse",
+      "Cluster_test": "G01",
+      "path": "prototype\\evaluation\\cluster_search\\raw\\G01.json",
+      "sha256": "948f4ab5b5d192378530424d7b9b83eecb088c9a4b29da309dc687da376b6b56"
+    },
+    {
+      "ID": "T02",
+      "query": "phone",
+      "Cluster_test": "G03",
+      "path": "prototype\\evaluation\\cluster_search\\raw\\G03.json",
+      "sha256": "dc36ed688870a2607b6580335e9db5a01bfe131b6dcae1d0541d09f564a7ebb3"
+    },
+    {
+      "ID": "T03",
+      "query": "drill",
+      "Cluster_test": "G05",
+      "path": "prototype\\evaluation\\cluster_search\\raw\\G05.json",
+      "sha256": "8d0667790dcb985622738e8d3c8dace3725213c27f4eb54eebf06be909b2d476"
+    },
+    {
+      "ID": "T04",
+      "query": "board game",
+      "Cluster_test": "G10",
+      "path": "prototype\\evaluation\\cluster_search\\raw\\G10.json",
+      "sha256": "548f0bc25b175a6a1cb0c4107a459f5b5a48bd3504a67bcf6604ebb63d35d3a6"
+    }
+  ],
+  "overlap_formula": "Presenze di prodotti clusterizzati con item_id nella lista tradizionale / totale presenze nei cluster * 100",
+  "zero_denominator": "Percentuale vuota se nessun prodotto clusterizzato",
+  "positions": "Posizioni da 1 nell'ordine restituito; cella vuota se assente o richiesta fallita"
+}

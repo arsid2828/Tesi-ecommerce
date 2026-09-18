@@ -1,0 +1,76 @@
+{
+  "created_at": "2026-09-18T09:00:28.217090+00:00",
+  "selection_before_recommendations": true,
+  "family_selection": "Numero prodotti validi decrescente, parità alfabetica; prime quattro ammissibili, nessuna deroga manuale.",
+  "possible_complements": "Prodotti validi unici con almeno un match tramite _title_matches_complement; conteggio potenziale, non ranking né raccomandazioni.",
+  "eligibility": "item_id univoco non vuoto, titolo e categoria non vuoti, prezzo finito positivo; nessun filtro sulla qualità delle raccomandazioni.",
+  "catalog_sha256": "2e04d9de6ac7d773f2741f48cb6e91b703c5f62ada2a7d21b0c473540baa08cf",
+  "service_sha256": "5360dff030ed307976a2338cf46451869823f17bdd6943175e0f84f463ab73a4",
+  "tests": [
+    {
+      "ID_test": "F01",
+      "item_id": "B005VC8D88",
+      "titolo": "Canon PG-240 XL Black Ink Catridge Compatible to printer MG2120, MG3120, MG4120, MX512, MX432, MX372, MX522, MX452, MG3520, MG3620, MX472, MX532, TS5120",
+      "categoria": "Office Products",
+      "prezzo": 24.0,
+      "famiglia_riconosciuta": "printer",
+      "tipologie_complementari_previste": [
+        "ink",
+        "cartridge",
+        "paper"
+      ],
+      "popularity_score": 0.1741,
+      "criterio_di_selezione": "Massimo popularity_score; parità: item_id crescente"
+    },
+    {
+      "ID_test": "F02",
+      "item_id": "B0075RW2KC",
+      "titolo": "GoTags Personalized Dog Collar, Custom Embroidered with Pet Name and Phone Number in Blue, Black, Pink, Red and Orange, for Boy and Girl Dogs, 4 Adjustable Sizes, XSmall, Small, Medium, and Large",
+      "categoria": "Pet Supplies",
+      "prezzo": 18.95,
+      "famiglia_riconosciuta": "phone",
+      "tipologie_complementari_previste": [
+        "case",
+        "charger",
+        "cable",
+        "screen protector",
+        "headphones",
+        "earbuds"
+      ],
+      "popularity_score": 0.1946,
+      "criterio_di_selezione": "Massimo popularity_score; parità: item_id crescente"
+    },
+    {
+      "ID_test": "F03",
+      "item_id": "B006JH8T3S",
+      "titolo": "Logitech HD Pro Webcam C920, Widescreen Video Calling and Recording, 1080p Camera, Desktop or Laptop Webcam (Discontinued by manufacturer)",
+      "categoria": "Electronics",
+      "prezzo": 64.49,
+      "famiglia_riconosciuta": "camera",
+      "tipologie_complementari_previste": [
+        "tripod",
+        "memory card",
+        "battery",
+        "lens",
+        "case"
+      ],
+      "popularity_score": 0.2267,
+      "criterio_di_selezione": "Massimo popularity_score; parità: item_id crescente"
+    },
+    {
+      "ID_test": "F04",
+      "item_id": "B005GQOSF6",
+      "titolo": "Shark SV1106 Navigator Freestyle Upright Bagless Cordless Stick Vacuum for Carpet, Hard Floor and Pet with XL Dust Cup and 2-Speed Brushroll, White/Grey",
+      "categoria": "Home and Kitchen",
+      "prezzo": 159.99,
+      "famiglia_riconosciuta": "vacuum",
+      "tipologie_complementari_previste": [
+        "filter",
+        "replacement bag",
+        "brush"
+      ],
+      "popularity_score": 0.1561,
+      "criterio_di_selezione": "Massimo popularity_score; parità: item_id crescente"
+    }
+  ]
+}

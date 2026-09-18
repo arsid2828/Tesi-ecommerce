@@ -1,0 +1,9 @@
+﻿ID,Item_id,Prodotto,Categoria,Famiglia,N_simili_alternative,N_utili_insieme,Prodotti_mostrati,Fallback,Nome_gruppo_simili,Nome_gruppo_complementari
+R01,B001FWYGJS,"TP-Link N300 Wireless Extender, Wi-Fi Router (TL-WR841N) - 2 x 5dBi High Power Antennas, Supports Access Point, WISP, Up to 300Mbps",Electronics,router,8,2,10,No,Simili e alternative,Utili insieme
+R02,B003YT6RNS,"HP 61 Black/Tri-color Ink (2 Count - pack) | Works with DeskJet 1000, 1010, 1050, 1510, 2050, 2510, 2540, 3000, 3050, 3510; ENVY 4500, 5530; OfficeJet 2620, 4630 | Eligible for Instant Ink | CR259FN",Office Products,,8,4,12,No,Simili e alternative,Utili insieme
+R03,B001892AX2,"Himalayan Glow 1002 Crystal, 6-8 Lbs, Salt Lamp",Tools and Home Improvement,,4,4,8,No,Simili e alternative,Utili insieme
+R04,B00006JSUA,"Lodge 10.25 Inch Cast Iron Pre-Seasoned Skillet – Signature Teardrop Handle - Use in the Oven, on the Stove, on the Grill, or Over a Campfire, Black",Home and Kitchen,,8,0,8,No,Simili e alternative,
+R05,B00BYH6C1E,Drop Stop - The Original Patented Car Seat Gap Filler (AS SEEN ON Shark Tank) - Set of 2 and Slide Free Pad and Light,Automotive,,2,0,2,No,Simili e alternative,
+R06,B001ZFIA6U,"Franklin Sports Ball Pump Kit -7.4"" Sports Ball Pump with Needle - Perfect for Basketballs, Soccer Balls and More - Complete Hand Pump Kit with Needles, Flexible Hose, Air Pressure Gauge and Carry Bag",Sports and Outdoors,,8,0,8,No,Simili e alternative,
+R07,B001HWZ85M,"TERRO T300B Liquid Ant Killer, 12 Bait Stations",Patio Lawn and Garden,,5,4,9,No,Simili e alternative,Utili insieme
+R08,B004S8F7QM,Cards Against Humanity,Toys and Games,card_game,8,0,8,No,Simili e alternative,

@@ -1,0 +1,20 @@
+﻿Famiglia,Tipologie_complementari,N_prodotti_catalogo,N_prodotti_validi,N_complementari_possibili,Mapping_presente
+board_game,,17,17,0,Sì
+camera,tripod; memory card; battery; lens; case,132,132,480,Sì
+card_game,,20,20,0,Sì
+computer_keyboard,mouse; wrist rest; usb hub; monitor,46,46,55,Sì
+computer_mouse,keyboard; mouse pad; wrist rest; usb hub,15,15,28,Sì
+computer_receiver,,4,4,0,No
+controller,headset; charger; cable,61,61,242,Sì
+headphones,headphone stand; audio cable; usb hub,63,63,4,Sì
+laptop,mouse; keyboard; monitor; cable; charger,36,36,281,Sì
+monitor,,38,38,0,No
+mouse_accessory,,1,1,0,No
+phone,case; charger; cable; screen protector; headphones; earbuds,169,169,483,Sì
+printer,ink; cartridge; paper,275,275,246,Sì
+refrigerator_filter,replacement filter,23,23,12,Sì
+router,ethernet cable; wifi adapter,35,35,2,Sì
+storage,,36,36,0,No
+tablet,,24,24,0,No
+usb_hub,,1,1,0,Sì
+vacuum,filter; replacement bag; brush,76,76,180,Sì

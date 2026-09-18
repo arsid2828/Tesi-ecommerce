@@ -1,0 +1,17 @@
+﻿ID_test,Item_id_raccomandato,Famiglia_raccomandato,Tipologie_corrispondenti,Complementarita_prevista
+F01,B003YT6RNS,,ink,Sì
+F01,B003YFHCKY,,cartridge,Sì
+F01,B00006IATH,,paper,Sì
+F01,B003UATQDO,,ink,Sì
+F02,B000EULZDM,board_game,case,Sì
+F02,B000CITK8S,,charger,Sì
+F02,B00DY1F2CS,,cable,Sì
+F02,B009EJ92PC,phone,screen protector,Sì
+F03,B003GEJ5J4,,tripod,Sì
+F03,B0047WZOOO,storage,memory card,Sì
+F03,B000CITK8S,,battery,Sì
+F03,B0000AVVO2,,lens,Sì
+F04,B0045LLC7K,refrigerator_filter,filter,Sì
+F04,B0010TEFFQ,,brush,Sì
+F04,B009NWOUG6,refrigerator_filter,filter,Sì
+F04,B002JAKRAM,refrigerator_filter,filter,Sì

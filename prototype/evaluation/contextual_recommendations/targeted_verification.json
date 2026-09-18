@@ -1,0 +1,22 @@
+{
+  "completed_at": "2026-09-18T09:00:32.031555+00:00",
+  "tests": 4,
+  "review_rows": 42,
+  "preexisting_files_unchanged": 73,
+  "manifest_unchanged": true,
+  "gemini_calls": 0,
+  "mapping_counts": {
+    "F01": {
+      "Sì": 4
+    },
+    "F02": {
+      "Sì": 4
+    },
+    "F03": {
+      "Sì": 4
+    },
+    "F04": {
+      "Sì": 4
+    }
+  }
+}

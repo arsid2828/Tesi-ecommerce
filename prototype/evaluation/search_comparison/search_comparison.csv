@@ -1,0 +1,5 @@
+﻿ID,Query,Cluster_test,N_risultati_tradizionale,N_prodotti_clusterizzata,N_cluster,Nomi_cluster,Prodotti_comuni,Overlap_percent
+T01,mouse,G01,80,11,4,Mouse da Gaming Avanzati; Mouse Wireless per Uso Quotidiano; Set Tastiera e Mouse Wireless; Mouse da Gaming Essenziali,11,100.0
+T02,phone,G03,80,22,6,Vivavoce Bluetooth per Auto; Protezioni per Schermo e Corpo; Custodie con Clip da Cintura; Supporti per Attività e Veicoli; Telefoni e Componenti Essenziali; Custodie Protettive Generiche,6,27.27272727272727
+T03,drill,G05,80,19,5,Trapani Elettrici e Avvitatori; Set di Punte da Trapano; Accessori per Foratura; Kit Freno Auto con Dischi Forati; Prodotti Correlati e Giochi,14,73.68421052631578
+T04,board game,G10,34,23,6,Giochi Classici per Famiglie; Giochi di Strategia e Ragionamento; Giochi a Tema Fantasy e Avventura; Giochi Tradizionali e Set Completi; Espansioni e Complementi per Giochi; Giochi Complessi per Esperti e Edizioni Speciali,21,91.30434782608695

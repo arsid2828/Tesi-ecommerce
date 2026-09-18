@@ -1,0 +1,9 @@
+﻿ID,HTTP_status,Errore,Avvisi,Fallback_risposta,Used_ai_support,TFIDF_disponibile,Started_at,Durata_secondi
+R01,200,,,False,False,True,2026-09-18T08:45:52.141280+00:00,0.536
+R02,200,,,False,False,True,2026-09-18T08:45:52.679088+00:00,1.01
+R03,200,,,False,False,True,2026-09-18T08:45:53.690344+00:00,0.822
+R04,200,,,False,False,True,2026-09-18T08:45:54.513805+00:00,0.515
+R05,200,,,False,False,True,2026-09-18T08:45:55.030278+00:00,0.603
+R06,200,,,False,False,True,2026-09-18T08:45:55.634519+00:00,0.522
+R07,200,,,False,False,True,2026-09-18T08:45:56.157821+00:00,0.87
+R08,200,,,False,False,True,2026-09-18T08:45:57.029129+00:00,0.47

@@ -4,8 +4,8 @@ G02,Generale,headphones,assente,5,15,Cuffie con Cancellazione del Rumore; Aurico
 G03,Generale,phone,assente,6,22,Vivavoce Bluetooth per Auto; Protezioni per Schermo e Corpo; Custodie con Clip da Cintura; Supporti per Attività e Veicoli; Telefoni e Componenti Essenziali; Custodie Protettive Generiche,Sì
 G04,Generale,printer,assente,4,15,Stampanti Multifunzione Wireless; Stampanti Monofunzione e Specializzate; Cartucce Toner Compatibili; Cartucce Inchiostro e Etichette,Sì
 G05,Generale,drill,assente,5,19,Trapani Elettrici e Avvitatori; Set di Punte da Trapano; Accessori per Foratura; Kit Freno Auto con Dischi Forati; Prodotti Correlati e Giochi,Sì
-G06,Generale,vacuum,assente,1,4,Migliore scelta,No
-G07,Generale,car accessories,assente,1,4,Migliore scelta,No
+G06,Generale,vacuum,assente,6,20,Aspirapolvere per la Casa; Accessori e Ricambi per Aspirapolvere; Aspirapolvere Specializzati e per Esterni; Sistemi e Sacchetti per Sottovuoto Alimentare; Componenti e Pompe per Vuoto Industriale/Automotive; Giocattoli,Sì
+G07,Generale,car accessories,assente,3,6,Accessori Essenziali per Auto; Vivavoce Bluetooth per Auto; Accessori per Golf Cart,Sì
 G08,Generale,garden tools,assente,5,18,Utensili Manuali per il Giardino; Soluzioni per l'Irrigazione e la Cura dell'Acqua; Prodotti per la Semina e la Crescita delle Piante; Arredi e Strutture per Esterni; Accessori Decorativi per il Giardino,Sì
 G09,Generale,fitness equipment,assente,4,14,Macchine Cardio per la Casa; Attrezzi per Forza e Corpo Libero; Programmi di Allenamento in DVD; Accessori e Supporto per l'Allenamento,Sì
 G10,Generale,board game,assente,6,23,Giochi Classici per Famiglie; Giochi di Strategia e Ragionamento; Giochi a Tema Fantasy e Avventura; Giochi Tradizionali e Set Completi; Espansioni e Complementi per Giochi; Giochi Complessi per Esperti e Edizioni Speciali,Sì
@@ -16,5 +16,5 @@ S01-R2,Stabilità,mouse,assente,4,10,Mouse da Gaming Wireless; Mouse da Gaming C
 S01-R3,Stabilità,mouse,assente,3,10,Mouse da Gaming; Mouse per Uso Quotidiano; Set Tastiera e Mouse,Sì
 S02-R2,Stabilità,phone,raggruppa per fascia di prezzo,6,24,Accessori Ultra Economici; Accessori a Basso Costo; Accessori Convenienti; Accessori di Fascia Media; Accessori Premium; Dispositivi e Accessori Speciali,Sì
 S02-R3,Stabilità,phone,raggruppa per fascia di prezzo,6,24,Accessori Essenziali (Sotto i 7€); Protezione e Ricambi (7€ - 8.99€); Accessori Funzionali (8.99€ - 10.99€); Supporti e Protezioni Sportive (11€ - 20€); Supporti e Custodie Premium (29€ - 39€); Telefoni e Accessori di Valore Superiore (Oltre 49€),Sì
-S03-R2,Stabilità,headphones,raggruppa per utilizzo,1,4,Migliore scelta,No
-S03-R3,Stabilità,headphones,raggruppa per utilizzo,1,4,Migliore scelta,No
+S03-R2,Stabilità,headphones,raggruppa per utilizzo,5,15,Cuffie per Bambini; Cuffie con Cancellazione del Rumore; Cuffie per Studio e DJ; Cuffie In-Ear e Wireless per la Mobilità; Cuffie Versatili per Uso Quotidiano,Sì
+S03-R3,Stabilità,headphones,raggruppa per utilizzo,5,15,Per Bambini; Con Cancellazione del Rumore; Per Studio e DJ; Portatili e In-Ear; Per Uso Quotidiano,Sì
