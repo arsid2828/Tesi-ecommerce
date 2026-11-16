@@ -31,6 +31,10 @@ except ImportError:
 logger=logging.getLogger(__name__)
 DEFAULT_GROUP_LIMIT=4
 LOCAL_PRODUCT_BASE_URL="http://localhost:3000/product.html"
+KEYBOARD_MOUSE_COMBO=re.compile(
+    r"\b(?:keyboard\s+(?:and\s+|&\s+)?(?:wireless\s+)?mouse|"
+    r"mouse\s+(?:and\s+|&\s+)?(?:wireless\s+)?keyboard)\b"
+)
 
 
 # Candidato locale con score intermedi per ranking e raggruppamento.
@@ -192,6 +196,8 @@ def _product_family(product: Product) -> str | None:
         return "board_game"
     if re.search(r"\b(mouse pad|mouse mat|mouzpad|wrist rest)\b",title):
         return "mouse_accessory"
+    if KEYBOARD_MOUSE_COMBO.search(title):
+        return "keyboard_mouse_combo"
     mouse_noise=r"\b(mickey|minnie|scrapbook|puzzle|balloon|rodent|trap|glue|bait|pest|insect|platform|tray)\b"
     if re.search(
         r"\b(computer mouse|wireless mouse|corded mouse|gaming mouse|laser mouse|optical mouse|touch mouse|trackball)\b",
@@ -222,14 +228,19 @@ def _product_family(product: Product) -> str | None:
         ("headphones",r"\b(headphones|headset|earbuds|earphones)\b"),
         ("monitor",r"\bmonitor\b"),
         ("router",r"\b(router|wi-fi extender|wifi extender|access point)\b"),
+        ("printer_supply",r"\b(?:ink|toner) car?tridges?\b"),
         ("printer",r"\bprinter\b"),
+        ("webcam",r"^(?!.*\b(?:bezel|web\s*cam cover)\b).*\bweb\s*cam\b"),
         ("camera",r"\b(camera|camcorder)\b"),
         ("controller",r"\b(controller|gamepad)\b"),
         ("storage",r"\b(hard drive|ssd|flash drive|memory card)\b"),
         ("laptop",r"\b(laptop|notebook computer)\b"),
         ("tablet",r"\btablet\b"),
-        ("phone",r"\b(phone|smartphone|iphone)\b"),
+        ("pet_collar",r"\b(?:dog|cat|pet) collars?\b"),
+        ("phone",r"\b(phone(?!\s+number\b)|smartphone|iphone)\b"),
         ("refrigerator_filter",r"\b(refrigerator|water) filter\b"),
+        ("vacuum_part",r"\b(?:vacuum (?:cleaner )?(?:replacement |dust cup )?(?:filters?|bags?|brush(?:es)?)|"
+                       r"(?:filters?|bags?|brush(?:es)?) (?:for|compatible with) .*\bvacuum)\b"),
         ("vacuum",r"\bvacuum\b"),
     ]
     for family,pattern in family_patterns:
@@ -251,6 +262,16 @@ def _build_local_groups(
     source_family=_product_family(source)
     same_family=[item for item in scored if source_family and _product_family(item.product) == source_family]
     comparable=same_family if len(same_family) >= limit else scored
+    if source_family == "printer_supply":
+        # Una cartuccia della stessa tipologia e utile solo se corrisponde al codice richiesto.
+        model=re.search(r"\b[a-z]{1,4}[- ]?\d{2,}[a-z0-9]*\b",_normalize(source.title))
+        if model is None:
+            return []
+        model_pattern=rf"\b{re.escape(model.group())}\b"
+        comparable=[
+            item for item in same_family
+            if re.search(model_pattern,_normalize(item.product.title))
+        ]
 
     # Gruppo unico: simili + alternative ordinate per mix di testo, qualita, prezzo e diversita.
     sim_alt_valid=[
@@ -472,6 +493,17 @@ def _bundle_candidates(
     if not complement_terms:
         return []
 
+    if _product_family(source) == "vacuum":
+        # Per i ricambi, il nome generico "filter" o "brush" non basta.
+        model=re.search(r"\b[a-z]{1,4}\d{3,}[a-z0-9]*\b",_normalize(source.title))
+        if model is None:
+            return []
+        model_pattern=rf"\b{re.escape(model.group())}\b"
+        all_products=[
+            product for product in all_products
+            if re.search(model_pattern,_normalize(product.title))
+        ]
+
     by_id={item.product.item_id:item for item in scored}
     primary=[]
     remaining=[]
@@ -547,7 +579,6 @@ def _bundle_score(source: Product,product: Product) -> float:
 
 
 def _complement_terms(product: Product) -> list[str]:
-    text=_product_text(product)
     family=_product_family(product)
     family_mapping={
         "computer_mouse": ["keyboard","mouse pad","wrist rest","usb hub"],
@@ -565,41 +596,17 @@ def _complement_terms(product: Product) -> list[str]:
         "usb_hub": [],
         "router": ["ethernet cable","wifi adapter"],
     }
-    if family:
-        return family_mapping.get(family,[])
-    mapping={
-        "phone": ["case","charger","cable","screen protector","headphones","earbuds"],
-        "smartphone": ["case","charger","cable","screen protector","headphones","earbuds"],
-        "cell": ["case","charger","cable","screen protector","headphones"],
-        "iphone": ["case","charger","cable","screen protector"],
-        "camera": ["tripod","memory card","battery","lens","case"],
-        "photo": ["tripod","memory card","battery","lens"],
-        "printer": ["ink","cartridge","paper"],
-        "ink": ["printer","paper","cartridge"],
-        "filter": ["replacement","water filter","refrigerator"],
-        "refrigerator": ["filter","replacement"],
-        "laptop": ["mouse","keyboard","monitor","cable","charger"],
-        "computer": ["mouse","keyboard","monitor","cable"],
-        "mouse": ["keyboard","mouse pad","headset","usb"],
-        "gaming": ["controller","keyboard","headset","mouse pad"],
-        "xbox": ["controller","headset","charger"],
-        "playstation": ["controller","headset","charger"],
-        "vacuum": ["filter","replacement","bag","brush"],
-    }
-    terms=[]
-    for key,values in mapping.items():
-        if key in text:
-            terms.extend(values)
-    return _dedupe(terms)[:12]
+    # Senza una famiglia riconosciuta, le parole della descrizione sono un segnale troppo debole.
+    return family_mapping.get(family,[])
 
 
 def _title_matches_complement(product: Product,term: str) -> bool:
     title=_normalize(product.title)
     if term == "keyboard":
-        return bool(re.search(r"\bkeyboard\b",title)) and not bool(re.search(
+        return bool(re.search(r"\bkeyboard\b",title)) and not KEYBOARD_MOUSE_COMBO.search(title) and not re.search(
             r"\b(phone|cover|case|skin|protector|replacement|receiver|tablet|ipad|macbook|drawer|platform|tray|desk|stand|bag|midi|piano|organ|remote|dock|folio)\b",
             title,
-        ))
+        )
     if term == "mouse":
         return _product_family(product) == "computer_mouse"
     if term == "mouse pad":
@@ -1137,15 +1144,6 @@ def _parse_json_object(raw_response: str) -> dict[str,Any]:
     if not isinstance(data,dict):
         raise ValueError("La risposta AI non e un oggetto JSON.")
     return data
-
-
-def _dedupe(values: list[str]) -> list[str]:
-    result=[]
-    for value in values:
-        clean=str(value or "").strip().lower()
-        if clean and clean not in result:
-            result.append(clean)
-    return result
 
 
 def _normalize(value: Any) -> str:

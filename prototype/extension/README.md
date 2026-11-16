@@ -1,57 +1,12 @@
-# Estensione Chrome demo locale
+# Estensione Chrome
 
-Questa cartella contiene una piccola estensione Chrome Manifest V3 per il prototipo e-commerce della tesi.
+L’estensione mostra consigli nel popup a partire dalla scheda prodotto aperta. Sul sito locale usa il catalogo del prototipo. Su Amazon legge i prodotti correlati già presenti nella pagina e usa il backend, se disponibile, per rifinire i suggerimenti.
 
-L'estensione non raccoglie dati personali, non salva cronologia utente e non interagisce con login, carrello o acquisti. Sul prototipo locale comunica con backend e frontend locali; sulle pagine Amazon reali si limita a riconoscere il prodotto visibile leggendo ASIN, titolo e immagine dalla pagina.
+## Installazione locale
 
-## Cosa fa
+1. [Avvia la demo](../README.md) con frontend sulla porta 3000 e backend sulla porta 8000.
+2. Apri `chrome://extensions` in Chrome e attiva **Modalità sviluppatore**.
+3. Seleziona **Carica estensione non pacchettizzata** e scegli la cartella `prototype/extension/`.
+4. Apri una scheda prodotto della demo e fai clic sull’icona dell’estensione.
 
-- mostra nel popup lo stato del backend locale;
-- mostra la URL della tab corrente;
-- rileva `item_id` quando la tab e' su `http://localhost:3000/product.html?id=...`;
-- carica il dettaglio prodotto con immagine da `GET http://localhost:8000/products/{item_id}`;
-- su pagine prodotto locali carica gruppi contestuali da `GET http://localhost:8000/recommendations/contextual/{item_id}`;
-- mostra prodotti simili, scelte alternative e prodotti da acquistare assieme, tutti presi solo dal dataset locale;
-- apre la pagina prodotto locale quando si clicca un consiglio;
-- usa Gemini solo dal backend per rifinire label e motivazioni, senza permettere all'AI di scegliere o inventare prodotti;
-- resta invisibile nella pagina e passa al popup il prodotto rilevato, senza inserire pannelli dimostrativi;
-- riconosce pagine prodotto Amazon reali su `amazon.it`, `amazon.com`, `amazon.co.uk`, `amazon.de`, `amazon.fr` e `amazon.es`;
-- sulle pagine Amazon legge prodotti reali gia' visibili nel DOM della pagina, li organizza in gruppi e li rende cliccabili;
-- se il backend e Gemini non sono disponibili, su Amazon mostra comunque un fallback con candidati reali letti dalla pagina.
-
-## Avvio demo
-
-Dal repository:
-
-```bash
-python -m uvicorn prototype.backend.app:app --port 8000
-```
-
-In un secondo terminale:
-
-```bash
-python -m http.server 3000 -d prototype/frontend
-```
-
-Poi:
-
-1. aprire Chrome;
-2. andare su `chrome://extensions`;
-3. attivare `Developer mode`;
-4. cliccare `Load unpacked`;
-5. selezionare `prototype/extension/`;
-6. aprire una pagina prodotto locale, per esempio `http://localhost:3000/product.html?id=<item_id>`;
-7. aprire il popup dell'estensione: i consigli contestuali vengono caricati automaticamente.
-
-## Test su Amazon reale
-
-1. ricaricare l'estensione da `chrome://extensions`;
-2. aprire una pagina prodotto Amazon, per esempio una URL nel formato `https://www.amazon.it/dp/<ASIN>`;
-3. verificare che l'estensione non aggiunga box o pannelli alla pagina;
-4. aprire il popup e controllare che mostri `Prodotto Amazon rilevato`, l'ASIN e, se la pagina contiene card correlate leggibili, consigli reali cliccabili.
-
-## Limiti
-
-Questa e' una demo per il prototipo di tesi. Il backend deve essere avviato manualmente e il catalogo locale deve esistere in `prototype/data/products_demo.json`.
-
-Su Amazon reale l'estensione non fa crawling e non inventa risultati con Gemini. Prende solo link prodotto gia' presenti nella pagina corrente. Per cercare prodotti Amazon fuori dalla pagina servirebbe integrare nel backend una sorgente esterna esplicita, per esempio una API ufficiale/partner o un motore di ricerca con grounding, mantenendo Gemini come organizzatore e non come fonte non verificata.
+Puoi provare il popup anche su una pagina prodotto di Amazon.it, Amazon.com, Amazon.co.uk, Amazon.de, Amazon.fr o Amazon.es. I suggerimenti dipendono dalle schede correlate che l’estensione riesce a leggere nella pagina. Il popup può mostrarli anche se il backend locale è spento.

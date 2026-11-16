@@ -1,12 +1,14 @@
 // Frontend vanilla del prototipo e-commerce.
 // Gestisce home, ricerca a cluster/lista e pagina dettaglio parlando con il backend FastAPI.
 const BASE_API_URL = "http://localhost:8000";
+const GEMINI_SEARCH_TIMEOUT_MS = 30000;
 
 const state = {
   profiles: [],
   currentProfileId: "cold-start",
   homeRequestId: 0,
   searchRequestId: 0,
+  sortedSearch: null,
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -64,6 +66,7 @@ function setupDiscoveryControls() {
     runCatalogSearch();
   });
   mode.addEventListener("change", updateSearchModeControls);
+  document.getElementById("sortBy").addEventListener("change", renderSortedSearch);
   document.getElementById("clearSearchButton").addEventListener("click", clearSearchResults);
   updateSearchModeControls();
 }
@@ -71,7 +74,7 @@ function setupDiscoveryControls() {
 // Mostra i controlli coerenti con la modalita scelta.
 // In vista ordinata nasconde il prompt Gemini e mostra il criterio di sort.
 function updateSearchModeControls() {
-  const isSorted = document.getElementById("resultMode").value === "sorted";
+  const isSorted = document.querySelector('input[name="resultMode"]:checked').value === "sorted";
   document.getElementById("aiQueryField").classList.toggle("hidden", isSorted);
   document.getElementById("sortField").classList.toggle("hidden", !isSorted);
 }
@@ -84,55 +87,77 @@ function runInitialSearchFromUrl() {
   if (!query) {
     return;
   }
-  const mode = params.get("view") === "sorted" ? "sorted" : "clusters";
+  const view = params.get("view");
+  const mode = view === "sorted" ? "sorted" : "clusters";
   const allowedSorts = new Set(["price_asc", "price_desc", "rating_desc", "reviews_desc"]);
   const sort = allowedSorts.has(params.get("sort")) ? params.get("sort") : "price_asc";
   document.getElementById("searchInput").value = query;
   document.getElementById("aiQueryInput").value = params.get("intent") || "";
-  document.getElementById("resultMode").value = mode;
+  document.querySelector(`input[name="resultMode"][value="${mode}"]`).checked = true;
   document.getElementById("sortBy").value = sort;
   updateSearchModeControls();
-  runCatalogSearch();
+  runCatalogSearch(view !== "local");
+}
+
+function readSearchForm() {
+  return {
+    query: document.getElementById("searchInput").value.trim(),
+    mode: document.querySelector('input[name="resultMode"]:checked').value,
+    aiQuery: document.getElementById("aiQueryInput").value.trim(),
+  };
 }
 
 // Esegue la ricerca catalogo dalla barra sticky.
 // Chiama /discover per cluster dinamici di Gemini oppure /search per risultati ordinabili lato client.
-async function runCatalogSearch() {
-  const query = document.getElementById("searchInput").value.trim();
+async function runCatalogSearch(useAi = true, search = readSearchForm()) {
+  const { query, mode } = search;
+  state.sortedSearch = null;
   if (!query) {
     renderSearchMessage("Scrivi una query, anche semplice come mouse.");
     return;
   }
 
-  const mode = document.getElementById("resultMode").value;
-  const sortBy = document.getElementById("sortBy").value;
-  const aiQuery = mode === "clusters" ? document.getElementById("aiQueryInput").value.trim() : "";
+  const aiQuery = mode === "clusters" ? search.aiQuery : "";
+  const useGemini = mode === "clusters" && useAi;
   const requestId = ++state.searchRequestId;
   setHomeContentVisible(false);
   setSearchLoading(true);
-  renderSearchLoading(query, aiQuery, mode);
+  renderSearchLoading(query, aiQuery, useGemini);
+  const localButton = document.getElementById("localSearchButton");
+  localButton.classList.toggle("hidden", !useGemini);
+  localButton.onclick = useGemini ? () => runCatalogSearch(false, search) : null;
   try {
     if (mode === "clusters") {
       const response = await postJson("/discover", {
         query,
         ai_query: aiQuery,
         limit: 80,
-        use_ai_support: true,
-      });
+        use_ai_support: useGemini,
+      }, useGemini ? AbortSignal.timeout(GEMINI_SEARCH_TIMEOUT_MS) : undefined);
       if (requestId !== state.searchRequestId) {
         return;
       }
       renderClusterSearch(response);
+      updateSearchUrl(query, mode, "", aiQuery, response.used_ai_support);
     } else {
       const products = await fetchJson(`/search?query=${encodeURIComponent(query)}&limit=80`);
       if (requestId !== state.searchRequestId) {
         return;
       }
-      renderSortedSearch(query, products, sortBy);
+      state.sortedSearch = {
+        query,
+        cards: new Map(products.map((product) => [product, createProductCard(product)])),
+      };
+      renderSortedSearch();
     }
-    updateSearchUrl(query, mode, sortBy, aiQuery);
     document.getElementById("searchResultsSection").scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
+    if (requestId !== state.searchRequestId) {
+      return;
+    }
+    if (useGemini && error.name === "TimeoutError") {
+      return runCatalogSearch(false, search);
+    }
     console.error(error);
     renderSearchMessage("Ricerca non disponibile.");
   } finally {
@@ -145,16 +170,21 @@ async function runCatalogSearch() {
 function setSearchLoading(isLoading) {
   const button = document.getElementById("searchButton");
   button.disabled = isLoading;
-  button.textContent = isLoading ? "Analisi..." : "Analizza";
+  button.textContent = isLoading ? "Ricerca…" : "Cerca";
+  if (!isLoading) {
+    const localButton = document.getElementById("localSearchButton");
+    localButton.classList.add("hidden");
+    localButton.onclick = null;
+  }
 }
 
-function renderSearchLoading(query, aiQuery, mode) {
+function renderSearchLoading(query, aiQuery, useGemini) {
   const section = document.getElementById("searchResultsSection");
   section.classList.remove("hidden");
   document.getElementById("clearSearchButton").classList.remove("hidden");
   document.getElementById("searchResultsKicker").textContent = "Ricerca in corso";
   document.getElementById("searchResultsTitle").textContent = `Risultati per “${query}”`;
-  document.getElementById("searchResultsSummary").textContent = mode === "clusters"
+  document.getElementById("searchResultsSummary").textContent = useGemini
     ? (aiQuery
       ? "Recupero i candidati locali, poi Gemini crea i cluster seguendo il criterio indicato."
       : "Recupero i candidati locali, poi Gemini crea i cluster più utili per la ricerca.")
@@ -167,12 +197,15 @@ function renderSearchLoading(query, aiQuery, mode) {
 // Mostra fonte del supporto AI, sintesi e numero di candidati recuperati.
 function renderClusterSearch(response) {
   const groups = response.groups || [];
+  const shown = groups.reduce((total, group) => total + (group.products || []).length, 0);
   document.getElementById("searchResultsKicker").textContent = response.used_ai_support
     ? "Cluster creati da Gemini · prodotti locali"
-    : "Cluster locali di fallback";
+    : "Risultati locali · senza Gemini";
   document.getElementById("searchResultsTitle").textContent = `Risultati per “${response.query}”`;
   document.getElementById("searchResultsSummary").textContent = response.answer || "Prodotti raggruppati in cluster.";
-  document.getElementById("searchResultsCount").textContent = `${Number(response.total_candidates || 0)} candidati`;
+  document.getElementById("searchResultsCount").textContent = shown
+    ? `${shown} mostrati · ${Number(response.total_candidates || 0)} candidati`
+    : "0 prodotti";
   renderSearchRoleGroups(groups);
 }
 
@@ -183,7 +216,7 @@ function renderSearchRoleGroups(groups) {
   container.className = "role-results search-role-results";
   container.innerHTML = "";
   if (!groups.length) {
-    renderMessage("searchResultsContent", "Nessun cluster trovato.");
+    renderMessage("searchResultsContent", "Prova un altro termine o il nome di un prodotto.");
     return;
   }
 
@@ -248,21 +281,26 @@ function formatProductCount(value) {
 }
 
 // Renderizza la vista lista ordinata della ricerca.
-// I prodotti vengono ordinati nel browser per prezzo, rating o numero recensioni.
-function renderSortedSearch(query, products, sortBy) {
-  const sorted = sortSearchProducts(products, sortBy);
+// Riordina le card gia caricate, anche al cambio del criterio nel menu.
+function renderSortedSearch() {
+  if (!state.sortedSearch) {
+    return;
+  }
+  const { query, cards } = state.sortedSearch;
+  const sortBy = document.getElementById("sortBy").value;
+  const sorted = sortSearchProducts(cards.keys(), sortBy);
+  updateSearchUrl(query, "sorted", sortBy, "", false);
   document.getElementById("searchResultsKicker").textContent = "Vista ordinata";
   document.getElementById("searchResultsTitle").textContent = `Risultati per “${query}”`;
   document.getElementById("searchResultsSummary").textContent = `Ordinamento: ${sortLabel(sortBy)}.`;
   document.getElementById("searchResultsCount").textContent = `${sorted.length} prodotti`;
   const container = document.getElementById("searchResultsContent");
   container.className = "product-grid ordered-search-grid";
-  container.innerHTML = "";
   if (!sorted.length) {
     renderMessage("searchResultsContent", "Nessun prodotto trovato.");
     return;
   }
-  sorted.forEach((product) => container.appendChild(createProductCard(product)));
+  container.replaceChildren(...sorted.map((product) => cards.get(product)));
 }
 
 // Ordina i risultati della ricerca con fallback di popolarita.
@@ -307,6 +345,7 @@ function renderSearchMessage(message) {
 // Pulisce input e parametri URL per tornare allo stato iniziale.
 function clearSearchResults() {
   state.searchRequestId += 1;
+  state.sortedSearch = null;
   setSearchLoading(false);
   setHomeContentVisible(true);
   document.getElementById("searchInput").value = "";
@@ -327,10 +366,10 @@ function setHomeContentVisible(isVisible) {
   });
 }
 
-function updateSearchUrl(query, mode, sortBy, aiQuery) {
+function updateSearchUrl(query, mode, sortBy, aiQuery, usedAi) {
   const url = new URL(window.location.href);
   url.searchParams.set("q", query);
-  url.searchParams.set("view", mode);
+  url.searchParams.set("view", mode === "clusters" && !usedAi ? "local" : mode);
   if (mode === "sorted") {
     url.searchParams.set("sort", sortBy);
     url.searchParams.delete("intent");
@@ -516,15 +555,18 @@ async function initProductPage() {
   const profileId = params.get("profile");
   const safeProfileId = profileId === "dataset-user" ? "dataset-user" : "cold-start";
   state.currentProfileId = safeProfileId;
-  if (profileId === "cold-start" || profileId === "dataset-user") {
+  if (profileId === "cold-start" || profileId === "dataset-user" || params.has("q")) {
     const backLink = document.getElementById("homeBackLink");
-    const homeParams = new URLSearchParams({ profile: safeProfileId, v: "product-recommendations-1" });
+    const homeParams = new URLSearchParams({ profile: safeProfileId });
     ["q", "view", "sort", "intent"].forEach((key) => {
       if (params.get(key)) {
         homeParams.set(key, params.get(key));
       }
     });
     backLink.href = `index.html?${homeParams.toString()}`;
+    if (homeParams.has("q")) {
+      backLink.textContent = "← Torna ai risultati";
+    }
   }
   if (!itemId) {
     renderMessage("productDetail", "Prodotto non specificato.");
@@ -548,11 +590,12 @@ async function fetchJson(path) {
 
 // Helper POST JSON verso il backend FastAPI.
 // Usato dalla discovery a cluster che invia query e criterio opzionale a Gemini.
-async function postJson(path, body) {
+async function postJson(path, body, signal) {
   const response = await fetch(`${BASE_API_URL}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal,
   });
   if (!response.ok) {
     throw new Error(`Errore API: ${response.status}`);
@@ -725,7 +768,13 @@ function createEvidenceBlock(product) {
     list.appendChild(snippet);
   });
   wrapper.appendChild(sources);
-  wrapper.appendChild(list);
+  if (list.childElementCount) {
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    summary.textContent = "Leggi le evidenze";
+    details.append(summary, list);
+    wrapper.appendChild(details);
+  }
   return wrapper;
 }
 
@@ -740,15 +789,19 @@ function renderProductDetail(product) {
   info.className = "detail-info";
   info.innerHTML = `
     <p class="category">${escapeHtml(product.category)}</p>
-    <h2>${escapeHtml(product.title)}</h2>
-    <p class="description">${escapeHtml(product.description || "Descrizione non disponibile.")}</p>
+    <h1>${escapeHtml(product.title)}</h1>
     <dl class="stats">
       <div><dt>Prezzo</dt><dd>${escapeHtml(formatPrice(product.price))}</dd></div>
       <div><dt>Valutazione</dt><dd>★ ${formatRating(product.average_rating)} su 5</dd></div>
       <div><dt>Recensioni</dt><dd>${Number(product.rating_count || 0).toLocaleString("it-IT")}</dd></div>
     </dl>
+    <details class="product-description"${(product.description || "").length <= 260 ? " open" : ""}>
+      <summary>Descrizione del prodotto</summary>
+      <p class="description">${escapeHtml(product.description || "Descrizione non disponibile.")}</p>
+    </details>
   `;
 
+  document.title = `${product.title} | Product Discovery`;
   container.appendChild(imageBox);
   container.appendChild(info);
 }

@@ -3,26 +3,26 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Dettaglio prodotto</title>
-    <link rel="stylesheet" href="style.css?v=product-recommendations-1">
+    <title>Dettaglio prodotto | Product Discovery</title>
+    <link rel="stylesheet" href="style.css?v=demo-ui-2">
   </head>
   <body data-page="product">
     <!--intestazione pagina dettaglio-->
     <header class="site-header compact">
       <div class="header-main">
-        <div>
-          <a id="homeBackLink" class="back-link" href="index.html?v=product-recommendations-1">Torna alla home</a>
-          <h1>Dettaglio prodotto</h1>
-        </div>
+        <a id="homeBackLink" class="back-link" href="index.html">← Torna alla home</a>
+        <p class="brand-kicker">Product Discovery</p>
       </div>
     </header>
 
     <!--contenuto principale della pagina prodotto-->
     <main class="page-shell product-shell">
       <!--dettaglio prodotto caricato via API-->
-      <section id="productDetail" class="product-detail"></section>
+      <section id="productDetail" class="product-detail" aria-live="polite">
+        <p class="empty-state">Caricamento prodotto…</p>
+      </section>
 
-      <section class="product-recommendations" aria-labelledby="productRecommendationsTitle">
+      <section id="productRecommendations" class="product-recommendations" aria-labelledby="productRecommendationsTitle">
         <div class="section-heading product-recommendations-heading">
           <div>
             <p class="section-kicker">Continua a scoprire</p>
@@ -37,6 +37,6 @@
     </main>
 
     <!--logica frontend vanilla JS-->
-    <script src="app.js?v=product-recommendations-1"></script>
+    <script src="app.js?v=demo-ui-3"></script>
   </body>
 </html>

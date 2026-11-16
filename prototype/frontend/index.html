@@ -3,14 +3,15 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Home personalizzata</title>
-    <link rel="stylesheet" href="style.css?v=product-recommendations-1">
+    <title>Product Discovery | Demo tesi</title>
+    <link rel="stylesheet" href="style.css?v=demo-ui-2">
   </head>
   <body data-page="home">
     <header class="site-header home-header">
       <div class="header-main">
         <div class="brand-block">
-          <p class="brand-kicker">E-commerce recommender demo</p>
+          <p class="brand-kicker">Demo della tesi</p>
+          <h1>Product Discovery</h1>
         </div>
 
         <div id="profileSwitcher" class="profile-switcher" aria-label="Seleziona il profilo della home">
@@ -40,17 +41,23 @@
             <input id="searchInput" type="search" placeholder="Es. mouse gaming wireless" autocomplete="off">
           </label>
 
-          <label class="field search-view-field">
-            <span>Visualizzazione</span>
-            <select id="resultMode">
-              <option value="clusters">Cluster dinamici (Gemini)</option>
-              <option value="sorted">Lista ordinata</option>
-            </select>
-          </label>
+          <fieldset id="resultMode" class="search-view-field">
+            <legend>Visualizzazione</legend>
+            <div class="search-mode-options">
+              <label>
+                <input type="radio" name="resultMode" value="sorted">
+                <span>Lista</span>
+              </label>
+              <label>
+                <input type="radio" name="resultMode" value="clusters" checked>
+                <span>Cluster Gemini</span>
+              </label>
+            </div>
+          </fieldset>
 
           <label id="aiQueryField" class="field ai-query-field">
-            <span>Come vuoi raggrupparli? (opzionale)</span>
-            <input id="aiQueryInput" type="text" placeholder="Es. separa per utilizzo e fascia di prezzo" autocomplete="off">
+            <span>Criterio (opzionale)</span>
+            <input id="aiQueryInput" type="text" placeholder="Es. per tipo di utilizzo" autocomplete="off">
           </label>
 
           <label id="sortField" class="field search-sort-field hidden">
@@ -63,7 +70,7 @@
             </select>
           </label>
 
-          <button id="searchButton" class="primary-button search-submit" type="submit">Analizza</button>
+          <button id="searchButton" class="primary-button search-submit" type="submit">Cerca</button>
           <button id="clearSearchButton" class="clear-search-button hidden" type="button">Chiudi risultati</button>
         </form>
       </section>
@@ -77,6 +84,7 @@
           </div>
           <span id="searchResultsCount" class="result-count"></span>
         </div>
+        <button id="localSearchButton" class="secondary-button search-local-button hidden" type="button">Mostra subito i risultati locali</button>
         <div id="searchResultsContent" aria-live="polite"></div>
       </section>
 
@@ -120,6 +128,6 @@
       </section>
     </main>
 
-    <script src="app.js?v=product-recommendations-1"></script>
+    <script src="app.js?v=demo-ui-3"></script>
   </body>
 </html>

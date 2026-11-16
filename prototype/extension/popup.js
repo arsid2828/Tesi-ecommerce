@@ -1,7 +1,8 @@
 // Popup Manifest V3 dell'estensione demo.
 // Mostra prodotto corrente e consigli contestuali leggendo backend locale e content script.
 const BACKEND_URL = "http://localhost:8000";
-const LOCAL_PRODUCT_URL = "http://localhost:3000/product.html";
+const LOCAL_ORIGIN = "http://localhost:3000";
+const LOCAL_PRODUCT_URL = `${LOCAL_ORIGIN}/product.html`;
 const DEFAULT_PRODUCT_IMAGE_URL = "placeholder-product.svg";
 
 //Stato minimo del popup
@@ -20,15 +21,10 @@ document.addEventListener("DOMContentLoaded", initPopup);
 async function initPopup() {
   const tab = await getActiveTab();
   popupState.activeTab = tab;
-  const currentUrl = tab && tab.url ? tab.url : "";
-
-  const loadButton = document.getElementById("loadProductButton");
-  if (loadButton) {
-    loadButton.addEventListener("click", loadCurrentProduct);
-  }
-
-  await updateProductPageState(tab, currentUrl);
-  await Promise.all([checkBackendStatus(), loadRecommendations()]);
+  const page = new URL(tab?.url || "about:blank");
+  const productAndRecommendations = updateProductPageState(tab, page)
+    .then(() => loadRecommendations(page.origin === LOCAL_ORIGIN));
+  await Promise.all([checkBackendStatus(), productAndRecommendations]);
 }
 
 // Recupera la tab attiva nella finestra corrente.
@@ -43,40 +39,31 @@ function getActiveTab() {
 
 // Aggiorna lo stato UI in base al prodotto rilevato.
 // Distingue pagina locale, pagina Amazon e pagina non riconosciuta.
-async function updateProductPageState(tab, currentUrl) {
-  const detection = await detectActiveProduct(tab, currentUrl);
+async function updateProductPageState(tab, page) {
+  const detection = await detectActiveProduct(tab, page.href);
   const product = detection.product;
-  const button = document.getElementById("loadProductButton");
-  const idValue = document.getElementById("itemIdValue");
-
-  popupState.itemId = null;
-  popupState.amazonProduct = null;
   popupState.amazonCandidates = detection.amazonCandidates || [];
-  if (button) {
-    button.hidden = true;
-    button.disabled = true;
-    button.textContent = "Carica prodotto";
-  }
-  if (idValue) {
-    idValue.hidden = true;
-  }
-  hideRecommendationDetail();
 
   if (!product) {
-    setText("productPageStatus", "Non sei su una pagina prodotto riconosciuta.");
-    setResultText("Apri una pagina prodotto locale o Amazon.");
+    const isLocal = page.origin === LOCAL_ORIGIN;
+    const isAmazon = window.ThesisProductDetector.isAmazonHost(page.hostname);
+    setText("productPageStatus", isLocal ? "Catalogo locale" : isAmazon ? "Amazon" : "Sito non supportato");
+    setResultText(isLocal || isAmazon
+      ? "Apri una scheda prodotto per vedere i consigli contestuali."
+      : "Apri un prodotto del prototipo o di Amazon per usare l’estensione.");
+    document.getElementById("recommendationsSection").classList.toggle("hidden", !isLocal);
     return;
   }
 
   if (product.kind === "amazon") {
     popupState.amazonProduct = product;
-    setText("productPageStatus", "Prodotto Amazon rilevato.");
+    setText("productPageStatus", "Pagina Amazon");
     renderAmazonProduct(product);
     return;
   }
 
   popupState.itemId = product.itemId;
-  setText("productPageStatus", "Pagina prodotto locale rilevata.");
+  setText("productPageStatus", "Catalogo locale");
   await loadCurrentProduct();
 }
 
@@ -169,7 +156,7 @@ async function checkBackendStatus() {
     status.textContent = "Backend online";
     status.className = "status-pill status-online";
   } catch (error) {
-    status.textContent = "Backend non raggiungibile";
+    status.textContent = "Backend offline";
     status.className = "status-pill status-offline";
   }
 }
@@ -178,18 +165,7 @@ async function checkBackendStatus() {
 // Per Amazon usa i dati gia letti dalla pagina, per locale chiama /products/{item_id}.
 async function loadCurrentProduct() {
   const result = document.getElementById("productResult");
-  if (popupState.amazonProduct) {
-    renderAmazonProduct(popupState.amazonProduct);
-    return;
-  }
-
-  if (!popupState.itemId) {
-    result.textContent = "Apri una pagina prodotto locale prima di caricare il prodotto.";
-    result.className = "result-box error-text";
-    return;
-  }
-
-  result.textContent = "Caricamento prodotto...";
+  result.textContent = "Caricamento prodotto…";
   result.className = "result-box muted-text";
 
   try {
@@ -217,16 +193,19 @@ function renderProduct(product) {
 
   const title = document.createElement("h2");
   title.textContent = product.title || "Titolo non disponibile";
+  title.title = title.textContent;
 
   const category = document.createElement("p");
   category.className = "category-line";
   category.textContent = product.category || "Categoria non disponibile";
 
-  const rating = document.createElement("p");
-  rating.textContent = `Rating medio: ${formatRating(product.average_rating)}`;
-
-  const reviews = document.createElement("p");
-  reviews.textContent = `Recensioni: ${Number(product.rating_count || 0).toLocaleString("it-IT")}`;
+  const stats = document.createElement("p");
+  stats.className = "current-product-meta";
+  stats.textContent = [
+    formatPrice(product.price),
+    `★ ${formatRating(product.average_rating)}`,
+    `${Number(product.rating_count || 0).toLocaleString("it-IT")} recensioni`,
+  ].filter(Boolean).join(" · ");
 
   const itemId = document.createElement("p");
   itemId.className = "product-id-line";
@@ -235,8 +214,7 @@ function renderProduct(product) {
   info.appendChild(category);
   info.appendChild(title);
   info.appendChild(itemId);
-  info.appendChild(rating);
-  info.appendChild(reviews);
+  info.appendChild(stats);
   layout.appendChild(imageBox);
   layout.appendChild(info);
   result.appendChild(layout);
@@ -262,10 +240,11 @@ function renderAmazonProduct(product) {
 
   const source = document.createElement("p");
   source.className = "category-line";
-  source.textContent = "Amazon reale";
+  source.textContent = "Dati della pagina";
 
   const title = document.createElement("h2");
   title.textContent = product.title || "Titolo non disponibile";
+  title.title = title.textContent;
 
   const asin = document.createElement("p");
   asin.className = "product-id-line";
@@ -287,8 +266,8 @@ function renderAmazonProduct(product) {
 }
 
 // Decide quale sorgente raccomandazioni caricare.
-// Locale, Amazon o fallback Popular dipendono dal tipo di pagina corrente.
-async function loadRecommendations() {
+// Il catalogo locale puo mostrare i bestseller quando e aperta la home.
+async function loadRecommendations(isLocalPage) {
   if (popupState.itemId) {
     await loadLocalRecommendations();
     return;
@@ -299,7 +278,9 @@ async function loadRecommendations() {
     return;
   }
 
-  await loadPopularRecommendations();
+  if (isLocalPage) {
+    await loadPopularRecommendations();
+  }
 }
 
 // Carica consigli contestuali per prodotto locale.
@@ -312,7 +293,7 @@ async function loadLocalRecommendations() {
       `/recommendations/contextual/${encodeURIComponent(popupState.itemId)}?limit=4&use_ai_support=true`,
     );
     renderRecommendationGroups(response.groups || [], "local");
-    status.textContent = response.used_ai_support ? "Locali + Gemini" : "Locali";
+    status.textContent = response.used_ai_support ? "Catalogo + Gemini" : "Catalogo locale";
   } catch (error) {
     renderRecommendationGroups([], "local");
     status.textContent = "Non disponibili";
@@ -343,28 +324,27 @@ async function loadAmazonRecommendations() {
       use_ai_support: true,
     });
     renderRecommendationGroups(response.groups || [], "amazon");
-    status.textContent = response.used_ai_support ? "Reali + Gemini" : "Reali";
+    status.textContent = response.used_ai_support ? "Amazon + Gemini" : "Dalla pagina Amazon";
   } catch (error) {
     renderRecommendationGroups(buildAmazonFallbackGroups(popupState.amazonCandidates, 4), "amazon");
-    status.textContent = "Reali dalla pagina";
+    status.textContent = "Dalla pagina Amazon";
   }
 }
 
-// Carica prodotti popolari quando non c'e una pagina prodotto.
-// Serve come stato utile del popup anche fuori da contesti riconosciuti.
+// Presenta i bestseller come tali quando e aperto il catalogo locale.
 async function loadPopularRecommendations() {
   const status = document.getElementById("recommendationsStatus");
+  setText("recommendationsTitle", "Più popolari nel catalogo");
   try {
-    const products = await fetchBackend("/recommendations/popular?limit=5");
+    const products = await fetchBackend("/recommendations/popular?limit=4");
     renderRecommendationGroups([
       {
         role_id: "popular",
-        label: "Popolari locali",
-        description: "Fallback dal catalogo locale.",
+        label: "Bestseller",
         products,
       },
     ], "local");
-    status.textContent = `${products.length} prodotti`;
+    status.textContent = "Catalogo locale";
   } catch (error) {
     renderRecommendationGroups([], "local");
     status.textContent = "Non disponibili";
@@ -377,7 +357,7 @@ function renderRecommendationGroups(groups, kind) {
   const list = document.getElementById("recommendationsList");
   list.innerHTML = "";
   hideRecommendationDetail();
-  const displayGroups = normalizeRecommendationGroups(groups, kind);
+  const displayGroups = normalizeRecommendationGroups(groups);
 
   if (!displayGroups.length) {
     const item = document.createElement("div");
@@ -389,44 +369,57 @@ function renderRecommendationGroups(groups, kind) {
     return;
   }
 
-  displayGroups.forEach((group) => {
-    const section = document.createElement("section");
+  displayGroups.forEach((group, index) => {
+    const section = document.createElement("details");
     section.className = `recommendation-group recommendation-group-${group.role_id || "generic"}`;
+    section.open = index === 0;
 
-    const heading = document.createElement("div");
+    const heading = document.createElement("summary");
     heading.className = "recommendation-group-heading";
 
-    const title = document.createElement("h3");
+    const title = document.createElement("span");
+    title.className = "recommendation-group-title";
     title.textContent = group.label || "Consigli";
 
     const count = document.createElement("span");
-    count.textContent = `${(group.products || []).length}`;
+    count.className = "recommendation-group-count";
+    count.textContent = group.products.length;
 
-    const description = document.createElement("p");
-    description.textContent = group.description || "";
-
-    heading.appendChild(title);
-    heading.appendChild(count);
+    heading.append(title, count);
     section.appendChild(heading);
-    if (description.textContent) {
-      section.appendChild(description);
-    }
 
     const products = document.createElement("div");
     products.className = "recommendation-products";
-    (group.products || []).slice(0, 4).forEach((product) => {
+    group.products.slice(0, 2).forEach((product) => {
       products.appendChild(createRecommendationButton(product, kind));
     });
 
     section.appendChild(products);
+    const extraProducts = group.products.slice(2);
+    if (extraProducts.length) {
+      const more = document.createElement("details");
+      more.className = "more-recommendations";
+      const summary = document.createElement("summary");
+      summary.textContent = extraProducts.length === 1
+        ? "Un altro suggerimento"
+        : `Altri ${extraProducts.length} suggerimenti`;
+      const extraRows = document.createElement("div");
+      extraRows.className = "recommendation-products";
+      extraProducts.forEach((product) => extraRows.appendChild(createRecommendationButton(product, kind)));
+      more.append(summary, extraRows);
+      section.appendChild(more);
+    }
     list.appendChild(section);
   });
 }
 
 // Trasforma i gruppi backend nella vista compatta del popup.
 // Separa simili/alternative da complementari in due blocchi distinti.
-function normalizeRecommendationGroups(groups, kind) {
+function normalizeRecommendationGroups(groups) {
   const safeGroups = Array.isArray(groups) ? groups : [];
+  if (safeGroups[0]?.role_id === "popular") {
+    return safeGroups.filter((group) => group.products.length);
+  }
   const similarAlt = [];
   const complementary = [];
   const seenSim = new Set();
@@ -452,20 +445,14 @@ function normalizeRecommendationGroups(groups, kind) {
   if (similarAlt.length) {
     displayGroups.push({
       role_id: "similar_alternatives",
-      label: kind === "amazon" ? "Simili e alternative reali" : "Simili e alternative",
-      description: kind === "amazon"
-        ? "Prodotti simili e alternative reali trovate nella pagina Amazon."
-        : "Prodotti della stessa tipologia e alternative da confrontare.",
-      products: similarAlt.slice(0, 8),
+      label: "Simili e alternative",
+      products: similarAlt.slice(0, 4),
     });
   }
   if (complementary.length) {
     displayGroups.push({
       role_id: "complementary",
       label: "Utili insieme",
-      description: kind === "amazon"
-        ? "Accessori e prodotti reali collegati all'acquisto principale."
-        : "Prodotti complementari e accessori da usare insieme.",
       products: complementary.slice(0, 4),
     });
   }
@@ -479,7 +466,7 @@ function createRecommendationButton(product, kind) {
   button.className = "recommendation-item";
   button.type = "button";
   button.addEventListener("click", () => {
-    renderRecommendationDetail(product, kind);
+    renderRecommendationDetail(product, kind, button);
   });
   button.setAttribute("aria-label", `Apri dettagli per ${product.title || "prodotto consigliato"}`);
 
@@ -489,30 +476,22 @@ function createRecommendationButton(product, kind) {
 
   const title = document.createElement("span");
   const meta = document.createElement("small");
-  const reason = document.createElement("small");
-  const action = document.createElement("small");
+  const arrow = document.createElement("span");
 
   title.textContent = product.title || "Prodotto senza titolo";
   meta.textContent = recommendationMeta(product, kind);
-  reason.className = "recommendation-reason";
-  reason.textContent = shortReason(product.role_reason || recommendationFallbackReason(product, kind));
-  action.className = "recommendation-action";
-  action.textContent = "Apri dettagli";
+  arrow.className = "recommendation-arrow";
+  arrow.setAttribute("aria-hidden", "true");
+  arrow.textContent = "›";
 
-  body.appendChild(title);
-  body.appendChild(meta);
-  if (reason.textContent) {
-    body.appendChild(reason);
-  }
-  body.appendChild(action);
-  button.appendChild(imageBox);
-  button.appendChild(body);
+  body.append(title, meta);
+  button.append(imageBox, body, arrow);
   return button;
 }
 
 // Mostra il dettaglio di un consiglio selezionato.
 // Include immagine, metadati, motivazione e bottone di apertura pagina.
-function renderRecommendationDetail(product, kind) {
+function renderRecommendationDetail(product, kind, trigger) {
   const detail = document.getElementById("recommendationDetail");
   if (!detail) {
     openRecommendationUrl(recommendationUrl(product, kind));
@@ -521,6 +500,7 @@ function renderRecommendationDetail(product, kind) {
 
   detail.innerHTML = "";
   detail.className = "recommendation-detail";
+  document.getElementById("recommendationsList").classList.add("hidden");
 
   const header = document.createElement("div");
   header.className = "recommendation-detail-heading";
@@ -530,13 +510,21 @@ function renderRecommendationDetail(product, kind) {
 
   const closeButton = document.createElement("button");
   closeButton.type = "button";
-  closeButton.className = "icon-button";
-  closeButton.textContent = "x";
-  closeButton.setAttribute("aria-label", "Chiudi dettaglio");
-  closeButton.addEventListener("click", hideRecommendationDetail);
+  closeButton.className = "recommendation-back";
+  closeButton.textContent = "← Torna ai consigli";
+  const showList = () => {
+    hideRecommendationDetail();
+    trigger.focus();
+  };
+  closeButton.addEventListener("click", showList);
+  detail.onkeydown = (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      showList();
+    }
+  };
 
-  header.appendChild(eyebrow);
-  header.appendChild(closeButton);
+  header.append(closeButton, eyebrow);
 
   const layout = document.createElement("div");
   layout.className = "recommendation-detail-layout";
@@ -559,7 +547,7 @@ function renderRecommendationDetail(product, kind) {
   const openButton = document.createElement("button");
   openButton.type = "button";
   openButton.className = "primary-button open-product-button";
-  openButton.textContent = "Apri pagina prodotto";
+  openButton.textContent = kind === "amazon" ? "Apri su Amazon" : "Apri nel catalogo";
   openButton.addEventListener("click", () => {
     openRecommendationUrl(recommendationUrl(product, kind));
   });
@@ -573,6 +561,7 @@ function renderRecommendationDetail(product, kind) {
   detail.appendChild(header);
   detail.appendChild(layout);
   detail.scrollIntoView({ block: "nearest" });
+  closeButton.focus({ preventScroll: true });
 }
 
 function hideRecommendationDetail() {
@@ -582,6 +571,8 @@ function hideRecommendationDetail() {
   }
   detail.innerHTML = "";
   detail.className = "recommendation-detail hidden";
+  detail.onkeydown = null;
+  document.getElementById("recommendationsList").classList.remove("hidden");
 }
 
 function productImageAdapter(product, kind) {
@@ -611,7 +602,16 @@ function recommendationUrl(product, kind) {
   if (kind === "amazon") {
     return product.product_url;
   }
-  return product.page_url || `${LOCAL_PRODUCT_URL}?id=${encodeURIComponent(product.item_id)}`;
+  const destination = new URL(product.page_url || `${LOCAL_PRODUCT_URL}?id=${encodeURIComponent(product.item_id)}`);
+  const current = new URL(popupState.activeTab?.url || LOCAL_ORIGIN);
+  if (current.origin === LOCAL_ORIGIN && destination.origin === LOCAL_ORIGIN) {
+    ["profile", "q", "view", "sort", "intent"].forEach((key) => {
+      if (current.searchParams.has(key)) {
+        destination.searchParams.set(key, current.searchParams.get(key));
+      }
+    });
+  }
+  return destination.href;
 }
 
 // Apre la URL del consiglio nella tab corrente quando possibile.
@@ -716,14 +716,6 @@ function setResultText(value) {
   const result = document.getElementById("productResult");
   result.textContent = value;
   result.className = "result-box muted-text";
-}
-
-function shortReason(value) {
-  const text = String(value || "").replace(/\s+/g, " ").trim();
-  if (text.length <= 150) {
-    return text;
-  }
-  return `${text.slice(0, 147).trim()}...`;
 }
 
 function recommendationFallbackReason(product, kind) {

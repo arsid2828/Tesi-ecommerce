@@ -15,28 +15,30 @@
     <!--intestazione compatta del popup-->
     <header class="popup-header">
       <div>
-        <p class="popup-kicker">Prototipo tesi</p>
-        <h1>Tesi E-commerce Demo</h1>
+        <p class="popup-kicker">Demo della tesi</p>
+        <h1>Product Discovery</h1>
       </div>
-      <div id="backendStatus" class="status-pill status-muted">Controllo backend...</div>
+      <div id="backendStatus" class="status-pill status-muted" role="status">Connessione…</div>
     </header>
 
     <!--riconoscimento prodotto locale o Amazon-->
-    <section class="popup-section">
-      <p class="label">Pagina prodotto</p>
-      <p id="productPageStatus" class="muted-text">Verifica URL in corso...</p>
-      <p id="itemIdValue" class="item-id-value hidden">item_id non rilevato</p>
-      <button id="loadProductButton" class="primary-button hidden" type="button" disabled>Carica prodotto</button>
-      <div id="productResult" class="result-box muted-text">Nessun prodotto caricato.</div>
+    <section class="popup-section" aria-labelledby="currentProductTitle">
+      <div class="section-heading">
+        <h2 id="currentProductTitle">Prodotto aperto</h2>
+        <p id="productPageStatus" class="source-pill">Rilevamento…</p>
+      </div>
+      <div id="productResult" class="result-box muted-text" aria-live="polite">Cerco il prodotto nella scheda corrente.</div>
     </section>
 
     <!--raccomandazioni contestuali dal backend o dalla pagina Amazon reale-->
-    <section class="popup-section">
+    <section id="recommendationsSection" class="popup-section" aria-labelledby="recommendationsTitle">
       <div class="section-heading">
-        <h2>Consigli contestuali</h2>
-        <span id="recommendationsStatus" class="small-muted">Caricamento...</span>
+        <h2 id="recommendationsTitle">Consigli contestuali</h2>
+        <span id="recommendationsStatus" class="source-pill" role="status">In attesa…</span>
       </div>
-      <div id="recommendationsList" class="recommendations-list"></div>
+      <div id="recommendationsList" class="recommendations-list">
+        <p class="empty-list-item">Caricamento dei suggerimenti…</p>
+      </div>
       <div id="recommendationDetail" class="recommendation-detail hidden"></div>
     </section>
   </main>

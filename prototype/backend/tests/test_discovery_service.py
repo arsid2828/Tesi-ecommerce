@@ -8,6 +8,8 @@ from prototype.backend.services.discovery_service import (
     discover_products,
 )
 from prototype.backend.services.query_utils import expand_query_terms
+from prototype.backend.services.recommendation_service import contextual_recommendations
+from prototype.backend.services.search_service import search_products
 
 
 class EmptyEvidenceService:
@@ -294,6 +296,25 @@ class DiscoveryServiceTest(unittest.TestCase):
         self.assertIsInstance(response.answer,str)
         self.assertEqual(response.groups[0].role_id,"best_choice")
 
+    def test_unmatched_query_returns_no_products_without_calling_gemini(self):
+        with patch("prototype.backend.services.discovery_service.call_gemini") as gemini:
+            response=discover_products(self.products,"zzq-demo-inesistente",self.evidence_service)
+
+        gemini.assert_not_called()
+        self.assertEqual(response.total_candidates,0)
+        self.assertEqual(response.groups,[])
+
+    def test_rare_match_is_not_padded_with_popular_products(self):
+        products=self.products + [
+            Product(item_id="popular",title="Garden chair",category="Garden",popularity_score=1.0),
+        ]
+        response=discover_products(
+            products,"programmable",self.evidence_service,use_ai_support=False,
+        )
+
+        self.assertEqual(response.total_candidates,4)
+        self.assertEqual({p.item_id for p in response.groups[0].products},{"p1","p3","p5","p7"})
+
     # --- 8. Sinonimi condivisi ---
 
     def test_shared_synonyms_telefono_finds_phone(self):
@@ -317,10 +338,47 @@ class DiscoveryServiceTest(unittest.TestCase):
                 popularity_score=0.9,
             )
         ]
-        from prototype.backend.services.search_service import search_products
         results=search_products(phone_products,"telefono")
         self.assertTrue(len(results) > 0)
         self.assertEqual(results[0].item_id,"ph1")
+
+    def test_both_searches_require_the_requested_concepts(self):
+        cases=[
+            ("libri","The Hobbit","Books","Laser Printer","Font: Calibri"),
+            ("libri","The Hobbit","Books","WD My Book External Hard Drive","Book series"),
+            ("PlayStation","DualShock 4 for PlayStation 4","Video Games","Xbox One Controller","PlayStation comparison"),
+            ("PS4","DualShock 4 for PlayStation 4","Video Games","Controller for PlayStation 3",""),
+            ("mouse wireless","Wireless Computer Mouse","Electronics","Wireless Router","Mouse compatible"),
+            ("stampante laser","Monochrome Laser Printer","Office Products","Labels for Laser Inkjet Printer",""),
+            ("gaming","Gaming Mouse","Electronics","Wireless Router","Gaming"),
+            ("cover iphone 5","Case for iPhone 5","Electronics","Case for iPhone 5C",""),
+            ("TP-Link","TP-Link Wireless Router","Electronics","Automatic Cat Feeder","Works with TP-Link outlet"),
+            ("filtro","Vacuum Filter Pack","Home and Kitchen","Replacement Keyboard",""),
+        ]
+        for query,title,category,noise,description in cases:
+            with self.subTest(query=query,noise=noise):
+                products=[
+                    Product(item_id="match",title=title,category=category),
+                    Product(item_id="noise",title=noise,category="Electronics",
+                            description=description,popularity_score=1.0),
+                ]
+                self.assertEqual([p.item_id for p in search_products(products,query)],["match"])
+                response=discover_products(products,query,self.evidence_service,use_ai_support=False)
+                self.assertEqual(response.total_candidates,1)
+                self.assertEqual([p.item_id for g in response.groups for p in g.products],["match"])
+
+    def test_mouse_complements_use_a_separate_keyboard(self):
+        products=[
+            Product(item_id=item_id,title=title,category="Electronics",image_url="https://example.org/product.png")
+            for item_id,title in [
+                ("mouse","Logitech Wireless Mouse"),
+                ("keyboard","Logitech Wireless Keyboard"),
+                ("combo","Logitech Wireless Keyboard and Mouse Bundle"),
+            ]
+        ]
+        response=contextual_recommendations(products,"mouse",self.evidence_service,use_ai_support=False)
+        complements=[p.item_id for g in response.groups if g.role_id=="complementary" for p in g.products]
+        self.assertEqual(complements,["keyboard"])
 
 
 if __name__ == "__main__":

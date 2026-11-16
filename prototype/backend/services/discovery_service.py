@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from prototype.backend.schemas import DiscoveryEvidence,DiscoveryProduct,DiscoveryRoleGroup,DiscoverySearchResponse,Product
-from prototype.backend.services.query_utils import expand_query_terms,tokenize_query
+from prototype.backend.services.query_utils import CatalogQuery,tokenize_query
 
 # Servizio di product discovery a cluster.
 # Recupera candidati localmente con una sola scansione del catalogo;
@@ -30,7 +30,7 @@ DEFAULT_GEMINI_MODEL="gemini-2.5-flash"
 
 
 # Restituisce i prodotti piu popolari del catalogo.
-# Serve come fallback quando la query e vuota o non produce candidati sufficienti.
+# Serve per la query vuota.
 def most_popular(products: list[Product],limit: int=10) -> list[Product]:
     ordered=sorted(products,key=lambda product: product.popularity_score,reverse=True)
     return ordered[:limit]
@@ -103,12 +103,11 @@ def discover_products(
     retrieval_query=_short_text(query,max_chars=160)
     grouping_request=_short_text(ai_query,max_chars=240)
     safe_limit=max(1,min(int(limit or 80),200))
-    query_terms=expand_query_terms(retrieval_query)
-    candidates=_retrieve_candidates(products,retrieval_query,query_terms,safe_limit)
+    candidates=_retrieve_candidates(products,retrieval_query,safe_limit)
 
     scored=[
-        _score_product(product=product,query_terms=query_terms)
-        for product in candidates
+        _score_product(product,match_score)
+        for match_score,product in candidates
     ]
     scored.sort(key=lambda item:(-item.quality_score,item.product.item_id))
 
@@ -118,7 +117,6 @@ def discover_products(
                 retrieval_query=retrieval_query,
                 grouping_request=grouping_request,
                 scored=scored,
-                query_terms=query_terms,
                 total_candidates=len(candidates),
                 evidence_service=evidence_service,
             )
@@ -138,42 +136,35 @@ def discover_products(
 # Attraversa il catalogo una sola volta e calcola la rilevanza di ogni prodotto.
 # Ordina per match_score desc, popularity_score desc, item_id asc.
 # Se la query e vuota restituisce direttamente i piu popolari.
-# Se i risultati sono insufficienti completa con prodotti popolari senza nuove ricerche.
+# Una query esplicita restituisce solo i candidati con una corrispondenza testuale.
 def _retrieve_candidates(
     products: list[Product],
     query: str,
-    query_terms: list[str],
     limit: int,
-) -> list[Product]:
+) -> list[tuple[float,Product]]:
     if not query.strip():
-        return most_popular(products,limit=min(limit,40))
+        return [
+            (0.25*_safe_float(product.popularity_score),product)
+            for product in most_popular(products,limit=min(limit,40))
+        ]
 
+    matcher=CatalogQuery(query)
     scored=[]
     for product in products:
-        match=_text_relevance(product,query_terms)
+        match=matcher.relevance(product)
         if match > 0:
             scored.append((match,product))
 
     scored.sort(key=lambda row:(-row[0],-_safe_float(row[1].popularity_score),row[1].item_id))
-    result=[product for _match,product in scored]
-
-    if len(result) < min(12,len(products)):
-        seen={product.item_id for product in result}
-        for product in most_popular(products,limit=20):
-            if product.item_id not in seen:
-                result.append(product)
-                seen.add(product.item_id)
-
-    return result[:limit]
+    return scored[:limit]
 
 
 # Calcola i punteggi locali di un prodotto senza costruire evidenze.
 # Le evidenze vengono aggiunte separatamente solo sui prodotti finali.
 def _score_product(
     product: Product,
-    query_terms: list[str],
+    match_score: float,
 ) -> ScoredProduct:
-    match_score=_text_relevance(product,query_terms)
     rating_score=_rating_score(product)
     review_score=_review_count_score(product)
     popularity_score=_safe_float(product.popularity_score)
@@ -245,15 +236,6 @@ def _build_fallback_group(scored: list[ScoredProduct]) -> list[DiscoveryRoleGrou
     return [group]
 
 
-# Seleziona i candidati migliori da inviare a Gemini.
-# Preferisce i prodotti con match_score > 0 mantenendo al massimo MAX_AI_CANDIDATES.
-def _ai_candidate_pool(scored: list[ScoredProduct]) -> list[ScoredProduct]:
-    relevant=[item for item in scored if item.match_score >= 0.08]
-    pool=relevant or scored[:]
-    ordered=pool + [item for item in scored if item not in pool]
-    return ordered[:MAX_AI_CANDIDATES]
-
-
 # Costruisce la risposta con cluster Gemini.
 # Invia a Gemini solo item_id e metadati; non include evidence pre-calcolate.
 # Le evidenze vengono aggiunte dopo la validazione, solo sui prodotti finali.
@@ -261,11 +243,10 @@ def _build_ai_groups(
     retrieval_query: str,
     grouping_request: str,
     scored: list[ScoredProduct],
-    query_terms: list[str],
     total_candidates: int,
     evidence_service: Any,
 ) -> DiscoverySearchResponse:
-    candidate_pool=_ai_candidate_pool(scored)
+    candidate_pool=scored[:MAX_AI_CANDIDATES]
     payload={
         "catalog_query": retrieval_query,
         "user_grouping_request": grouping_request,
@@ -493,36 +474,18 @@ def _local_answer(
     groups: list[DiscoveryRoleGroup],
     source_summary: dict[str,int],
 ) -> str:
+    if not groups:
+        return "Nessun prodotto trovato nel catalogo."
     source_text=", ".join(f"{label}: {count}" for label,count in source_summary.items()) or "metadati locali"
     if query.strip():
         return (
-            f"Ho analizzato \"{query}\" e creato {len(groups)} gruppi usando solo dati locali. "
+            f"Ho analizzato \"{query}\" e creato un gruppo usando solo dati locali. "
             f"Le fonti usate nelle motivazioni sono: {source_text}."
         )
     return (
         f"Mostro gruppi iniziali basati sui prodotti piu popolari del catalogo locale. "
         f"Le fonti usate nelle motivazioni sono: {source_text}."
     )
-
-
-def _text_relevance(product: Product,terms: list[str]) -> float:
-    if not terms:
-        return 0.25*_safe_float(product.popularity_score)
-    title=(product.title or "").lower()
-    category=(product.category or "").lower()
-    description=(product.description or "").lower()
-    score=0.0
-    max_score=max(1.0,len(terms)*4.5)
-    for term in terms:
-        if not term:
-            continue
-        if term in title:
-            score += 2.8
-        if term in category:
-            score += 1.4
-        if term in description:
-            score += 1.0
-    return round(min(score / max_score,1.0),4)
 
 
 def _rating_score(product: Product) -> float:

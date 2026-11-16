@@ -1,10 +1,10 @@
 import re
 from typing import Any
 
+from prototype.backend.schemas import Product
 
-#Mappa centralizzata dei sinonimi usata da discovery, search e product_qa.
-#Copre termini italiani comuni del dataset demo e li espande verso l'inglese.
-#Non modificare questa struttura senza aggiornare i test di sinonimi.
+
+# Sinonimi per il recupero di evidenze nelle recensioni e nelle QA.
 SYNONYM_MAP: dict[str,list[str]]={
     "mouse": ["wireless","programmable","gaming mouse"],
     "gaming": ["game","video games","wireless","controller"],
@@ -67,16 +67,137 @@ def _dedupe(values: list[str]) -> list[str]:
     return result
 
 
-#Restituisce lista di termini espansi per recupero e ranking dei candidati.
-#Include la query originale, i token singoli e i sinonimi di ciascuno.
+# Il catalogo usa equivalenze piu strette del recupero di evidenze testuali.
+_CATALOG_ALIASES={
+    term: group
+    for group in (
+        ("book","books","libro","libri","paperback","hardcover"),
+        ("board game","board games","gioco da tavolo","giochi da tavolo"),
+        ("game","games","gioco","giochi"),
+        ("mouse","mice","trackball"),
+        ("wireless","cordless","senza fili"),
+        ("gaming","gamer"),
+        ("printer","printers","stampante","stampanti"),
+        ("phone","phones","smartphone","smartphones","cell phone","telefono","telefoni","cellulare","cellulari"),
+        ("case","cover","custodia"),
+        ("headphones","headset","earbuds","earphones","cuffie","auricolari"),
+        ("vacuum","aspirapolvere"),
+        ("camera","cameras","fotocamera","fotocamere"),
+        ("filter","filters","filtro","filtri"),
+        ("battery","batteries","batteria","batterie"),
+        ("accessory","accessories","accessorio","accessori"),
+        ("xbox 360","xbox360"),
+        ("tp-link","tp link"),
+    )
+    for term in group
+}
+_CATALOG_ALIASES["playstation"]=("playstation","ps2","ps3","ps4","ps5","psp","ps vita")
+for generation in range(2,6):
+    platform=(f"playstation {generation}",f"ps{generation}")
+    _CATALOG_ALIASES.update(dict.fromkeys(platform,platform))
+_CATALOG_TOKEN=re.compile(
+    r"\b(?:iphone|xbox|playstation)\s+\d+[a-z]*\b|"
+    r"\b(?:board games?|gioch[io] da tavolo|senza fili|ps vita|xbox one|wii u|tp link)\b|[^\W_]+(?:-[^\W_]+)*"
+)
+_TITLE_TERMS={
+    "book","board game","mouse","wireless","gaming","printer","laser","phone","case","headphones",
+    "bluetooth","vacuum","playstation","psp","ps vita","xbox","xbox one","wii","wii u","hdmi","dog","collar","tp-link",
+}
+_BOOK_FORMAT=re.compile(r"\b(?:paperback|hardcover)\b",re.I)
+_TITLE_EXCLUSIONS={
+    "book": re.compile(r"\b(?:planner|book (?:stand|cover|light|shelf)|coloring book app)\b",re.I),
+    "mouse": re.compile(
+        r"\b(?:mickey|minnie|rodent|traps?|pest|glue boards?|mouse (?:pads?|mats?)|"
+        r"(?:receivers?|cases?) for [^,;]*\b(?:mouse|mice)|replacement feet)\b",re.I,
+    ),
+    "printer": re.compile(
+        r"\b(?:(?:ink|toner) (?:car?tridges?|refill|for)|car?tridges? ink|"
+        r"(?:labels?|stickers?|cables?|paper)\b.*\b(?:for|works with)|"
+        r"compatible to\b.*\bprinters?|printers? (?:ink|cables?|paper|stands?))\b",re.I,
+    ),
+    "phone": re.compile(
+        r"\b(?:phone (?:number|mounts?|holders?|stands?|cases?|adapters?|plans?|(?:replacement )?batter(?:y|ies))|"
+        r"screen protectors?|holster|stylus|armband|pouch|casepouchholster|headset adapters?|"
+        r"airtime|activation kit|signal booster|mini speaker system|printers?)\b",re.I,
+    ),
+    "headphones": re.compile(
+        r"\b(?:ear (?:pads?|cushions?)|replacement (?:single )?(?:pads?|cushions?)|windscreens?|headphone stand|car stereo|"
+        r"charg(?:e|ing) case|headsets? (?:adapters?|dongles?|jacks?)|"
+        r"(?:adapter|dongle)\b.*\b(?:compatible|headsets?))\b",re.I,
+    ),
+    "vacuum": re.compile(
+        r"\b(?:vacuum seal(?:er|ing)|vacuum pumps?|vacuum breakers?|storage space saver bags?|"
+        r"(?:replacement|water|dust cup|vacuum) filters?|replacement parts?|outer bags?|vacuum belts?|"
+        r"vacuum (?:cleaner )?(?:disposable |replacement )?bags?)\b",re.I,
+    ),
+    "collar": re.compile(r"\b(?:collar batter(?:y|ies)|tags? for)\b",re.I),
+}
+_ACCESSORY_TERMS={
+    "adapter","battery","cable","cartridge","cartuccia","case","filter","ink","mat","pad","paper","receiver","replacement","toner",
+}
+
+
+def _catalog_term_groups(text: Any) -> list[tuple[str,...]]:
+    query=" ".join(str(text or "").lower().split())
+    tokens=[query] if query in _CATALOG_ALIASES else _CATALOG_TOKEN.findall(query)
+    return list(dict.fromkeys(
+        _CATALOG_ALIASES.get(token,(token,))
+        for token in tokens
+        if token not in _STOPWORDS and token not in {"da","di","il","la","in"}
+    ))
+
+
 def expand_query_terms(text: Any) -> list[str]:
-    query=str(text or "").strip().lower()
-    tokens=tokenize_query(query)
-    terms=[query] if query else []
-    for token in tokens:
-        terms.append(token)
-        terms.extend(SYNONYM_MAP.get(token,[]))
-    return _dedupe(terms)[:18]
+    return _dedupe([term for group in _catalog_term_groups(text) for term in group])
+
+
+def _catalog_pattern(terms: tuple[str,...]) -> re.Pattern:
+    alternatives=[
+        r"[\W_]+".join(re.escape(word) for word in re.findall(r"[^\W_]+",term))
+        for term in terms
+    ]
+    return re.compile(r"(?<!\w)(?:"+"|".join(alternatives)+r")(?!\w)",re.I)
+
+
+class CatalogQuery:
+    """Compila i concetti una volta e richiede una corrispondenza per ciascuno."""
+
+    def __init__(self,query: str):
+        groups=_catalog_term_groups(query)
+        concepts={group[0] for group in groups}
+        self.books_only=concepts == {"book"}
+        self.patterns=[
+            (_catalog_pattern(group),
+             (group[0] in _TITLE_TERMS and not self.books_only) or any(char.isdigit() for char in group[0]))
+            for group in groups
+        ]
+        self.excluded_titles=[
+            _TITLE_EXCLUSIONS[concept] for concept in concepts if concept in _TITLE_EXCLUSIONS
+        ] if not concepts & _ACCESSORY_TERMS else []
+        self.gaming_only=concepts == {"gaming"}
+        self.phone_only=concepts == {"phone"}
+
+    def relevance(self,product: Product) -> float:
+        title=product.title
+        if any(pattern.search(title) for pattern in self.excluded_titles):
+            return 0.0
+        if self.gaming_only and product.category == "Toys and Games":
+            return 0.0
+        if self.phone_only and product.category in {"Toys and Games","Home and Kitchen","Pet Supplies"}:
+            return 0.0
+        if self.books_only and product.category.lower() != "books" and not _BOOK_FORMAT.search(title):
+            return 0.0
+        score=0.0
+        for pattern,title_required in self.patterns:
+            title_hit=bool(pattern.search(title))
+            if title_required and not title_hit:
+                return 0.0
+            category_hit=bool(pattern.search(product.category))
+            description_hit=bool(pattern.search(product.description or ""))
+            if not (title_hit or category_hit or description_hit):
+                return 0.0
+            score+=2.8*title_hit + 1.4*category_hit + 1.0*description_hit
+        return round(min(score / max(1.0,len(self.patterns)*4.5),1.0),4)
 
 
 #Restituisce la query come stringa unica arricchita con i sinonimi.
